@@ -31,7 +31,7 @@ export default function RootLayout({
     >
       <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
-        <Toaster />
+        <Toaster theme="light" />
       </body>
     </html>
   );
