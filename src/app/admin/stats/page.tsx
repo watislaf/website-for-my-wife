@@ -80,8 +80,8 @@ export default async function StatsPage() {
     return row;
   });
 
-  // ---- byDayHours: last 365 days ----
-  const rangeStart = addDays(today, -364);
+  // ---- byDayHours: same window the Heatmap renders (53×7 grid ending today) ----
+  const rangeStart = addDays(today, -(53 * 7 - 1));
   const byDayHours: Record<string, number> = {};
   for (const e of entries) {
     if (e.date < rangeStart || e.date > today) continue;
