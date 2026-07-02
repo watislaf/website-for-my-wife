@@ -1,3 +1,4 @@
+import "server-only";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -9,6 +10,8 @@ const dbPath = process.env.DATABASE_PATH ?? "./data/app.db";
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
+sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
+// Resolves drizzle/ relative to process.cwd() (project root under `next start`, /app in the Docker image).
 migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
