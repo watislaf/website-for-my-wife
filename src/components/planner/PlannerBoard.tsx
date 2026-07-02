@@ -312,7 +312,12 @@ function PlanItemRow({
             <Badge
               variant="outline"
               render={
-                <button type="button" onClick={moveToToday} disabled={pending} />
+                <button
+                  type="button"
+                  onClick={moveToToday}
+                  disabled={pending}
+                  aria-label="Move to today"
+                />
               }
               className="cursor-pointer"
             >
