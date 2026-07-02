@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "NODE_OPTIONS=--conditions=react-server tsx scripts/migrate.ts",
+    "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts"
   },
   "dependencies": {

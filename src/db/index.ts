@@ -7,7 +7,7 @@ import * as schema from "./schema";
 
 // Remote Turso when TURSO_DATABASE_URL is set; otherwise a local file: DB so
 // dev works with no Turso account. Migration is NOT run on import (libSQL's
-// migrate is async) — it lives in scripts/migrate.ts (`npm run db:migrate`).
+// migrate is async) — it lives in scripts/migrate.mjs (`npm run db:migrate`).
 const url =
   process.env.TURSO_DATABASE_URL ??
   "file:" + (process.env.DATABASE_PATH ?? "./data/app.db");
@@ -17,6 +17,11 @@ const url =
 if (url.startsWith("file:")) {
   const filePath = url.slice("file:".length);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
+} else if (url.startsWith("libsql://") || url.startsWith("https://")) {
+  // Fail fast at startup with a clear message rather than on first query.
+  if (!process.env.TURSO_AUTH_TOKEN) {
+    throw new Error("TURSO_AUTH_TOKEN required for remote libSQL url");
+  }
 }
 
 const client = createClient({

@@ -46,6 +46,17 @@ export async function toggleGoalCheck(goalId: number, date: string) {
 }
 
 function isUniqueConstraintError(err: unknown): boolean {
+  // Prefer the structured error code (driver-provided) over message-text matching.
+  const code =
+    err && typeof err === "object" && "code" in err
+      ? (err as { code?: unknown }).code
+      : undefined;
+  if (
+    code === "SQLITE_CONSTRAINT_UNIQUE" ||
+    code === "SQLITE_CONSTRAINT_PRIMARYKEY"
+  ) {
+    return true;
+  }
   const msg = err instanceof Error ? err.message : String(err);
   return /UNIQUE constraint failed/i.test(msg);
 }
@@ -57,8 +68,11 @@ export async function setGoalArchived(id: number, archived: boolean) {
 
 export async function deleteGoal(id: number) {
   // libSQL/Turso does not enforce FK ON DELETE CASCADE by default, so remove the
-  // child goalChecks rows explicitly before deleting the goal.
-  await db.delete(goalChecks).where(eq(goalChecks.goalId, id));
-  await db.delete(goals).where(eq(goals.id, id));
+  // child goalChecks rows explicitly. Wrap both deletes in a transaction so they
+  // are atomic (no orphaned goalChecks if the second delete fails).
+  await db.transaction(async (tx) => {
+    await tx.delete(goalChecks).where(eq(goalChecks.goalId, id));
+    await tx.delete(goals).where(eq(goals.id, id));
+  });
   revalidate();
 }
