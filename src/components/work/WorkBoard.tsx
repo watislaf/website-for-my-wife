@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { CalendarIcon } from "lucide-react";
 
 import type { PeriodSummary } from "@/lib/periods";
 import { createSource, setSourceArchived, createEntry } from "@/actions/work";
+import { PeriodCard } from "./PeriodCard";
+import { dateToStr, strToDate, prettyDate } from "./format";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,41 +40,7 @@ export type Source = {
   archived: boolean;
 };
 
-/* ---------- date helpers (LOCAL date parts, never toISOString) ---------- */
-
-function dateToStr(d: Date): string {
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, "0"),
-    String(d.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function strToDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d, 12, 0, 0);
-}
-
-function prettyDate(s: string): string {
-  return strToDate(s).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-/* ---------- format helpers ---------- */
-
-function fmtMoney(n: number): string {
-  return `$${n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function fmtHours(n: number): string {
-  return `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} h`;
-}
+/* Date + number format helpers live in ./format (shared with PeriodCard). */
 
 /* ============================================================= */
 
@@ -85,7 +54,6 @@ export function WorkBoard({
   today: string;
 }) {
   const active = sources.filter((s) => !s.archived);
-  const byId = new Map(sources.map((s) => [s.id, s]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -96,17 +64,13 @@ export function WorkBoard({
       <QuickAddForm active={active} today={today} />
 
       <div className="flex flex-col gap-6">
-        {periods.map((p, i) => (
-          <PeriodSummaryBlock
-            key={p.marker?.id ?? "open"}
-            period={p}
-            byId={byId}
-            isOpen={p.marker === null}
-            first={i === 0}
-          />
-        ))}
-        {/* Task 11: PeriodCard replaces this — entries table + close/move/delete markers.
-            Swap <PeriodSummaryBlock/> for <PeriodCard period={p} sources={sources} today={today} />. */}
+        <AnimatePresence initial={false}>
+          {periods.map((p) => (
+            <motion.div key={p.marker?.id ?? "open"} layout>
+              <PeriodCard period={p} sources={sources} today={today} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -357,94 +321,3 @@ function QuickAddForm({ active, today }: { active: Source[]; today: string }) {
   );
 }
 
-/* ---------- 3. Period list (minimal summary — Task 11 swaps in PeriodCard) ---------- */
-
-function PeriodSummaryBlock({
-  period,
-  byId,
-  isOpen,
-  first,
-}: {
-  period: PeriodSummary;
-  byId: Map<number, Source>;
-  isOpen: boolean;
-  first: boolean;
-}) {
-  const { marker, startDate, endDate, totals } = period;
-
-  const title = marker?.name
-    ? marker.name
-    : marker
-      ? `Period ending ${marker.endDate}`
-      : "Current period";
-
-  const range =
-    startDate && endDate
-      ? startDate === endDate
-        ? startDate
-        : `${startDate} → ${endDate}`
-      : "No entries yet";
-
-  const bySource = Object.entries(totals.bySource).sort(
-    (a, b) => b[1].amount - a[1].amount,
-  );
-
-  return (
-    <div
-      className={
-        isOpen
-          ? "flex flex-col gap-4 rounded-xl border border-primary/40 bg-primary/5 p-4"
-          : "flex flex-col gap-4 rounded-xl border border-border p-4"
-      }
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="flex flex-col">
-          <span className="font-heading text-base font-medium">{title}</span>
-          <span className="text-xs text-muted-foreground">{range}</span>
-        </div>
-        {isOpen && first && (
-          <span className="text-xs font-medium text-primary">Open</span>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-2 text-sm">
-        <Chip label={`${totals.daysWorked.toLocaleString()} days`} />
-        <Chip label={fmtHours(totals.hours)} />
-        <Chip label={fmtMoney(totals.amount)} />
-        <Chip label={`${fmtMoney(totals.perHour)}/h`} />
-      </div>
-
-      {bySource.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {bySource.map(([id, agg]) => {
-            const s = byId.get(Number(id));
-            return (
-              <div
-                key={id}
-                className="flex items-center gap-2 text-xs text-muted-foreground"
-              >
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: s?.color ?? "#999" }}
-                  aria-hidden
-                />
-                <span className="flex-1 truncate">{s?.name ?? "Unknown"}</span>
-                <span>{fmtHours(agg.hours)}</span>
-                <span>·</span>
-                <span>{fmtMoney(agg.amount)}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Chip({ label }: { label: string }) {
-  return (
-    <span className="rounded-lg bg-muted px-2.5 py-1 text-xs font-medium">
-      {label}
-    </span>
-  );
-}
