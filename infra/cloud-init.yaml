@@ -1,0 +1,9 @@
+#cloud-config
+package_update: true
+packages: [ca-certificates, curl, sqlite3]
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - mkdir -p /opt/personal/data /opt/personal/backups
+  - printf '#!/bin/sh\nsqlite3 /opt/personal/data/app.db ".backup /opt/personal/backups/app-$(date +%%F).db"\nls -t /opt/personal/backups/app-*.db | tail -n +15 | xargs -r rm\n' > /opt/personal/backup.sh
+  - chmod +x /opt/personal/backup.sh
+  - echo '15 3 * * * root /opt/personal/backup.sh' > /etc/cron.d/personal-backup

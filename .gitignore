@@ -44,3 +44,9 @@ next-env.d.ts
 data/
 *.db
 .env*.local
+
+# terraform
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
