@@ -1,27 +1,30 @@
 import "server-only";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
 
-const dbPath = process.env.DATABASE_PATH ?? "./data/app.db";
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
-// Wait instead of immediately throwing SQLITE_BUSY when another connection holds the lock.
-sqlite.pragma("busy_timeout = 5000");
+// Remote Turso when TURSO_DATABASE_URL is set; otherwise a local file: DB so
+// dev works with no Turso account. Migration is NOT run on import (libSQL's
+// migrate is async) — it lives in scripts/migrate.ts (`npm run db:migrate`).
+const url =
+  process.env.TURSO_DATABASE_URL ??
+  "file:" + (process.env.DATABASE_PATH ?? "./data/app.db");
 
-export const db = drizzle(sqlite, { schema });
-
-// Migrate on boot, but NOT during `next build`: page-data collection spawns many
-// worker processes that each import this module, and running DDL migrations
-// concurrently against a fresh DB races and throws SQLITE_BUSY. At build time
-// there is no persistent DB to migrate anyway — migration happens on server boot
-// (`node server.js`), where NEXT_PHASE is unset.
-if (process.env.NEXT_PHASE !== "phase-production-build") {
-  // Resolves drizzle/ relative to process.cwd() (project root under `next start`, /app in the Docker image).
-  migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
+// For a local file: url, ensure the parent directory exists. For a remote
+// libsql:// url there is no local file to create.
+if (url.startsWith("file:")) {
+  const filePath = url.slice("file:".length);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
+
+const client = createClient({
+  url,
+  // undefined authToken is fine for a file: url.
+  authToken: process.env.TURSO_DATABASE_URL
+    ? process.env.TURSO_AUTH_TOKEN
+    : undefined,
+});
+
+export const db = drizzle(client, { schema });

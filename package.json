@@ -9,12 +9,13 @@
     "lint": "eslint",
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
+    "db:migrate": "NODE_OPTIONS=--conditions=react-server tsx scripts/migrate.ts",
     "db:seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@libsql/client": "^0.17.4",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -39,7 +40,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",

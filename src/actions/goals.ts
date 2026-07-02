@@ -21,7 +21,7 @@ export async function createGoal(data: { title: string; emoji: string }) {
 
 /**
  * Idempotent, race-safe toggle. Delete-first: attempt to remove the
- * (goalId, date) row and inspect `changes`. If a row was deleted it was
+ * (goalId, date) row and inspect `rowsAffected`. If a row was deleted it was
  * present (now unchecked); if nothing was deleted, insert it (now checked).
  * This avoids the select-then-insert window where two rapid calls could both
  * miss the select and the second insert would violate the `goal_day` unique
@@ -33,7 +33,7 @@ export async function toggleGoalCheck(goalId: number, date: string) {
     .delete(goalChecks)
     .where(and(eq(goalChecks.goalId, goalId), eq(goalChecks.date, date)));
 
-  if (deleted.changes === 0) {
+  if (deleted.rowsAffected === 0) {
     try {
       await db.insert(goalChecks).values({ goalId, date });
     } catch (err) {
@@ -56,7 +56,9 @@ export async function setGoalArchived(id: number, archived: boolean) {
 }
 
 export async function deleteGoal(id: number) {
-  // goalChecks rows are removed via the ON DELETE CASCADE FK.
+  // libSQL/Turso does not enforce FK ON DELETE CASCADE by default, so remove the
+  // child goalChecks rows explicitly before deleting the goal.
+  await db.delete(goalChecks).where(eq(goalChecks.goalId, id));
   await db.delete(goals).where(eq(goals.id, id));
   revalidate();
 }
