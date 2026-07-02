@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { landing } from "@/content/landing";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,6 +31,7 @@ export default function RootLayout({
     >
       <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
+        <Toaster />
       </body>
     </html>
   );
