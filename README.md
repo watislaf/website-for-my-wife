@@ -29,6 +29,28 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Deployment (CI/CD)
+
+Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the Docker
+image, pushes it to GHCR, copies the compose file + `Caddyfile` to the Hetzner
+server, and runs `docker compose pull && docker compose up -d`. The SQLite DB lives
+on the host bind-mount (`/opt/personal/data`), so data survives redeploys.
+
+Required repo secrets: `SERVER_IP`, `SSH_PRIVATE_KEY` (GHCR uses the built-in
+`GITHUB_TOKEN`).
+
+**GHCR image names must be lowercase** — the workflow lowercases the repository
+automatically, but keep the GitHub owner/repo lowercase to be safe.
+
+**Manual re-pulls on the server:** the deploy run logs into GHCR with the per-run
+`GITHUB_TOKEN`, so the automated pull works even for a private repo. To pull
+manually later (outside a workflow run) you need a Personal Access Token with
+`read:packages`:
+
+```bash
+docker login ghcr.io -u <github-user> -p <PAT_with_read:packages>
+```
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
