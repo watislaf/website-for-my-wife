@@ -20,23 +20,34 @@ export async function createGoal(data: { title: string; emoji: string }) {
 }
 
 /**
- * Idempotent toggle: check for an existing (goalId, date) row first, then
- * delete it if present or insert it if absent. The `goal_day` unique index
- * (goalId+date) is a second guard against a double insert.
+ * Idempotent, race-safe toggle. Delete-first: attempt to remove the
+ * (goalId, date) row and inspect `changes`. If a row was deleted it was
+ * present (now unchecked); if nothing was deleted, insert it (now checked).
+ * This avoids the select-then-insert window where two rapid calls could both
+ * miss the select and the second insert would violate the `goal_day` unique
+ * index. The insert is additionally wrapped so a concurrent double-insert
+ * (unique-constraint) is swallowed as a no-op rather than throwing.
  */
 export async function toggleGoalCheck(goalId: number, date: string) {
-  const existing = await db
-    .select({ id: goalChecks.id })
-    .from(goalChecks)
-    .where(and(eq(goalChecks.goalId, goalId), eq(goalChecks.date, date)))
-    .limit(1);
+  const deleted = await db
+    .delete(goalChecks)
+    .where(and(eq(goalChecks.goalId, goalId), eq(goalChecks.date, date)));
 
-  if (existing.length > 0) {
-    await db.delete(goalChecks).where(eq(goalChecks.id, existing[0].id));
-  } else {
-    await db.insert(goalChecks).values({ goalId, date });
+  if (deleted.changes === 0) {
+    try {
+      await db.insert(goalChecks).values({ goalId, date });
+    } catch (err) {
+      // Concurrent insert already created the row (goal_day unique index):
+      // the desired state (checked) is satisfied, so treat as a no-op.
+      if (!isUniqueConstraintError(err)) throw err;
+    }
   }
   revalidate();
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg);
 }
 
 export async function setGoalArchived(id: number, archived: boolean) {
