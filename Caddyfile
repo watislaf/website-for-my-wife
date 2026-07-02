@@ -1,0 +1,4 @@
+# Caddyfile — replace :80 with the real domain once one exists; Caddy then auto-provisions TLS
+:80 {
+    reverse_proxy app:3000
+}

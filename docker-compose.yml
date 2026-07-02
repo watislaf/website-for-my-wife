@@ -1,0 +1,19 @@
+# docker-compose.yml  (lives at /opt/personal/ on the server)
+services:
+  app:
+    image: ghcr.io/GITHUB_USER/personal-site:latest   # replaced by deploy workflow sed
+    restart: unless-stopped
+    env_file: .env            # SESSION_SECRET, ADMIN_PASSWORD_HASH
+    environment:
+      - "TZ=${TZ:-Europe/Warsaw}"
+    volumes:
+      - /opt/personal/data:/data
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+volumes:
+  caddy_data:
