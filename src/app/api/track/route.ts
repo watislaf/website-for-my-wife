@@ -36,8 +36,11 @@ export async function POST(req: Request) {
 
   const rawTarget = (body as { target?: unknown }).target;
   const rawUtm = (body as { utmSource?: unknown }).utmSource;
-  const utmSource = typeof rawUtm === "string" ? rawUtm : null;
-  const target = type === "click" && typeof rawTarget === "string" ? rawTarget : "";
+  // Cap stored string lengths so a hostile caller can't POST a multi-MB value
+  // (inserted verbatim + would pollute the clicksByTarget aggregation).
+  const utmSource = typeof rawUtm === "string" ? rawUtm.slice(0, 128) : null;
+  const target =
+    type === "click" && typeof rawTarget === "string" ? rawTarget.slice(0, 128) : "";
 
   try {
     const source = resolveSource(utmSource, req.headers.get("referer"));
