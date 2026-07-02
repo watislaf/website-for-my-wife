@@ -1,37 +1,30 @@
-# Fly.io deploy config — volume-backed SQLite (libSQL file: mode), no Turso.
+# fly.toml app configuration file generated for website-for-my-wife on 2026-07-02T17:28:10Z
 #
-# The app name below is a placeholder; `fly launch` will confirm/replace it.
-# Migrations run at CONTAINER STARTUP (see Dockerfile CMD), NOT via
-# release_command — Fly's release machine has NO volume mounted, so it could
-# not migrate the on-disk /data/app.db. The real machine has the volume.
-app = "personal-site"
-primary_region = "fra"
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'website-for-my-wife'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
-# Non-secret runtime config. Secrets (SESSION_SECRET, ADMIN_PASSWORD_HASH) are
-# set with `fly secrets set` — do NOT put them here.
 [env]
-  DATABASE_PATH = "/data/app.db"
-  TZ = "Europe/Warsaw"
-  PORT = "3000"
+  DATABASE_PATH = '/data/app.db'
+  PORT = '3000'
+  TZ = 'Europe/Warsaw'
 
-# Persistent volume holding the SQLite file. Create it before first deploy:
-#   fly volumes create data --size 1 --region fra
 [[mounts]]
-  source = "data"
-  destination = "/data"
+  source = 'data'
+  destination = '/data'
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
-  # Scale to zero when idle to save cost. With a single volume you run one
-  # machine; a second machine would need its own volume and would not share data.
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
