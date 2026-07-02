@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/popover";
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -291,6 +292,20 @@ function EditEntryDialog({
   // Include archived sources so an entry's original source can still be shown.
   const options = sources;
 
+  // Re-seed fields from the current entry each time the dialog opens; the row
+  // stays mounted across revalidations (e.g. a marker move re-buckets it), so
+  // mount-only useState would otherwise show stale values on reopen.
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setDate(entry.date);
+      setSourceId(entry.sourceId);
+      setHours(String(entry.hours));
+      setAmount(String(entry.amount));
+      setNote(entry.note);
+    }
+    setOpen(next);
+  }
+
   function handleSave() {
     const h = hours === "" ? 0 : Number(hours);
     const a = amount === "" ? 0 : Number(amount);
@@ -320,18 +335,20 @@ function EditEntryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => setOpen(true)}
-        aria-label="Edit entry"
-      >
-        <PencilIcon />
-      </Button>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Edit entry">
+            <PencilIcon />
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit entry</DialogTitle>
+          <DialogDescription>
+            Update this entry; totals recalculate automatically.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -446,9 +463,9 @@ function ClosePeriodDialog({ today }: { today: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="default" onClick={() => setOpen(true)}>
-        Close period here
-      </Button>
+      <DialogTrigger
+        render={<Button variant="default">Close period here</Button>}
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Close period</DialogTitle>
@@ -525,9 +542,9 @@ function MoveMarkerDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="outline" onClick={() => setOpen(true)}>
-        Move / rename
-      </Button>
+      <DialogTrigger
+        render={<Button variant="outline">Move / rename</Button>}
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Move or rename period</DialogTitle>
