@@ -1,3 +1,11 @@
+# ALTERNATIVE (self-host) DEPLOY PATH — Hetzner + GHCR.
+#
+# The PRIMARY deploy target is Fly.io (see fly.toml + .github/workflows/fly-deploy.yml).
+# This Hetzner path is MANUAL-ONLY (workflow_dispatch): trigger it from the
+# Actions tab via "Run workflow". It intentionally does NOT run on push to main,
+# so pushes don't fail on the missing SERVER_IP / SSH_PRIVATE_KEY secrets that
+# only exist for the Hetzner setup.
+#
 # CD: build the app image, push to GHCR, and redeploy on the Hetzner server.
 #
 # GHCR lowercase requirement:
@@ -15,7 +23,7 @@
 #   (`docker login ghcr.io -u <user> -p <PAT>`). See README.
 name: deploy
 on:
-  push: { branches: [main] }
+  workflow_dispatch:
 permissions: { contents: read, packages: write }
 jobs:
   deploy:

@@ -1,0 +1,21 @@
+# PRIMARY DEPLOY PATH — Fly.io.
+#
+# Pushing to main deploys to Fly using the committed fly.toml. Migrations run
+# at container startup against the mounted volume (see Dockerfile CMD), so no
+# release_command / separate migrate step is needed here.
+#
+# Requires repo secret FLY_API_TOKEN (create with `fly tokens create deploy`).
+name: fly-deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: deploy-group
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

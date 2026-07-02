@@ -16,8 +16,10 @@ A single Next.js app that serves two things from one deployment:
   - **Landing analytics** — anonymous aggregate traffic for the public page
     (`/admin/traffic`)
 
-Data is stored in a local SQLite file (via Drizzle + better-sqlite3). Migrations
-run automatically on server boot from `drizzle/`.
+Data is stored in a SQLite file (via Drizzle + libSQL / `@libsql/client`).
+Migrations live in `drizzle/` and are applied by `scripts/migrate.mjs` — run at
+container startup in production (see the Fly.io section) and via
+`npm run db:migrate` locally.
 
 ## Local dev
 
@@ -133,6 +135,85 @@ npm run build   # production build sanity check
 
 For local dev, update `.env.local` instead (remember: **`\$`-escaped** there).
 
+## Deploy to Fly.io (primary)
+
+The app deploys to [Fly.io](https://fly.io) as a single machine with a
+**persistent volume** holding the SQLite file. No Turso / external DB is needed —
+libSQL runs against the on-disk file at `/data/app.db` (from `DATABASE_PATH`).
+
+1. **Install flyctl and sign in:**
+
+   ```bash
+   brew install flyctl        # or: curl -L https://fly.io/install.sh | sh
+   fly auth login
+   ```
+
+2. **Launch (using the committed `fly.toml`).** From the repo root:
+
+   ```bash
+   fly launch --no-deploy
+   ```
+
+   Accept/adjust the app name and `primary_region` when prompted — the committed
+   `fly.toml` already sets the volume mount (`/data`), `[env]`, and the build.
+
+3. **Create the volume** (same region as `primary_region` in `fly.toml`):
+
+   ```bash
+   fly volumes create data --size 1 --region fra
+   ```
+
+4. **Set secrets** (never commit these). Use the **RAW** bcrypt hash — Fly does
+   **no `$`-expansion**, so do **NOT** `\$`-escape it here (unlike `.env.local`):
+
+   ```bash
+   fly secrets set \
+     SESSION_SECRET="$(openssl rand -hex 32)" \
+     ADMIN_PASSWORD_HASH='$2b$12$....'   # RAW bcrypt hash, single-quoted, NO \$ escaping
+   ```
+
+5. **Deploy:**
+
+   ```bash
+   fly deploy
+   ```
+
+**How the DB / migrations work on Fly:**
+
+- Migrations run **automatically at container startup** — the image's entrypoint
+  is `node scripts/migrate.mjs && node server.js`. They run on the real machine
+  (which has the volume mounted), **not** via `release_command` (Fly's release
+  machine has **no** volume, so it could not migrate `/data/app.db`). Migration is
+  idempotent — drizzle tracks applied migrations — so running it every boot is safe.
+- The SQLite file lives on the `data` volume mounted at `/data`, so it **persists
+  across deploys**.
+- With a single volume you run **one machine**. `fly.toml` sets
+  `min_machines_running = 0` + `auto_stop_machines = "stop"` for scale-to-zero
+  cost savings; a second machine would need its own volume and would not share data.
+- **Turso is optional.** Setting `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` as Fly
+  secrets switches libSQL to managed Turso instead of the local file — useful if
+  you later want a stateless/ephemeral host with no volume. Leave them unset to
+  use the volume-backed file (the default).
+
+### CI/CD to Fly
+
+`.github/workflows/fly-deploy.yml` runs `flyctl deploy --remote-only` on every
+push to `main`. It needs a repo secret **`FLY_API_TOKEN`**:
+
+```bash
+fly tokens create deploy       # copy the token
+# then add it as the FLY_API_TOKEN repo secret in GitHub → Settings → Secrets
+```
+
+---
+
+## Alternative: self-host on Hetzner
+
+The following sections describe the **self-hosted** deploy path (Hetzner Cloud +
+GHCR + Caddy + Terraform). It is optional — the Fly.io path above is the primary
+target. The `.github/workflows/deploy.yml` workflow for this path is
+**manual-only** (`workflow_dispatch`); it does not run on push.
+
 ## Provisioning (first-time server setup)
 
 Infra lives in `infra/` (Terraform, Hetzner Cloud).
@@ -165,10 +246,14 @@ Infra lives in `infra/` (Terraform, Hetzner Cloud).
 
 ## Deployment (CI/CD)
 
-Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the Docker
-image, pushes it to GHCR, copies the compose file + `Caddyfile` to the Hetzner
-server, and runs `docker compose pull && docker compose up -d`. The SQLite DB lives
-on the host bind-mount (`/opt/personal/data`), so data survives redeploys.
+`.github/workflows/deploy.yml` builds the Docker image, pushes it to GHCR, copies
+the compose file + `Caddyfile` to the Hetzner server, and runs
+`docker compose pull && docker compose up -d`. The SQLite DB lives on the host
+bind-mount (`/opt/personal/data`), so data survives redeploys.
+
+This workflow is **manual-only** (`workflow_dispatch`) — trigger it from the
+GitHub **Actions** tab via **Run workflow**. It does **not** run on push to `main`
+(that would fail without the Hetzner secrets); pushes go to Fly.io instead.
 
 Required repo secrets: `SERVER_IP`, `SSH_PRIVATE_KEY` (GHCR uses the built-in
 `GITHUB_TOKEN`).
