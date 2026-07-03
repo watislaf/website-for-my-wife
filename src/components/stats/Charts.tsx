@@ -27,6 +27,15 @@ export type CumulativeRow = { month: string; [sourceName: string]: string | numb
 
 const AXIS = "var(--muted-foreground)";
 
+/** Compact axis tick: thousands-grouped, no decimals, prefixed to match the
+ *  tooltips (fmtMoney/fmtHours). Kept short so the Y axis stays narrow. */
+function moneyTick(v: number): string {
+  return `$${Math.round(v).toLocaleString()}`;
+}
+function hoursTick(v: number): string {
+  return `${Math.round(v).toLocaleString()}h`;
+}
+
 function TooltipBox({
   label,
   children,
@@ -83,7 +92,13 @@ export function Charts({
             <BarChart data={byMonth} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={48} />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS }}
+                tickLine={false}
+                axisLine={false}
+                width={52}
+                tickFormatter={metric === "amount" ? moneyTick : hoursTick}
+              />
               <Tooltip
                 cursor={{ fill: "var(--muted)", opacity: 0.4 }}
                 content={({ active, payload, label }) =>
@@ -124,7 +139,13 @@ export function Charts({
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={48} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: AXIS }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                  tickFormatter={moneyTick}
+                />
                 <Tooltip
                   content={({ active, payload, label }) =>
                     active && payload?.length ? (

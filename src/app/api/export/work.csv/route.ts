@@ -38,13 +38,17 @@ export async function GET() {
 
   const nameById = new Map(sources.map((s) => [s.id, s.name]));
 
-  const rows = [["date", "source", "hours", "amount", "note"]];
+  const rows = [["date", "source", "hours", "amount", "$/hour", "note"]];
   for (const e of entries) {
+    // Per-row $/hour; blank when hours is 0 (avoid divide-by-zero).
+    const perHour =
+      e.hours > 0 ? String(Math.round((e.amount / e.hours) * 100) / 100) : "";
     rows.push([
       e.date,
       nameById.get(e.sourceId) ?? "",
       String(e.hours),
       String(e.amount),
+      perHour,
       e.note,
     ]);
   }
