@@ -15,10 +15,11 @@ import {
   goalChecks,
   workEntries,
   periodMarkers,
+  incomeSources,
 } from "@/db/schema";
 import { buildPeriods } from "@/lib/periods";
 import { todayStr } from "@/lib/dates";
-import { fmtMoney, fmtHours } from "@/components/work/format";
+import { fmtMoney, fmtHours, prettyDate } from "@/components/work/format";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,13 +28,15 @@ import {
   CardContent,
   CardAction,
 } from "@/components/ui/card";
-import { TodayPlan } from "@/components/dashboard/TodayPlan";
+import { TodayPlan, type TodayPlanItem } from "@/components/dashboard/TodayPlan";
 import { TodayGoals } from "@/components/dashboard/TodayGoals";
+import { QuickAddPlan } from "@/components/dashboard/QuickAddPlan";
+import { QuickAddWork } from "@/components/dashboard/QuickAddWork";
 
 export default async function DashboardPage() {
   const today = todayStr();
 
-  const [todayPlan, activeGoals, todayChecks, entries, markers] =
+  const [todayPlan, activeGoals, todayChecks, entries, markers, sources] =
     await Promise.all([
       db
         .select()
@@ -54,7 +57,21 @@ export default async function DashboardPage() {
         .from(workEntries)
         .orderBy(asc(workEntries.date), asc(workEntries.id)),
       db.select().from(periodMarkers).orderBy(asc(periodMarkers.endDate)),
+      db
+        .select()
+        .from(incomeSources)
+        .where(eq(incomeSources.archived, false))
+        .orderBy(asc(incomeSources.id)),
     ]);
+
+  // Typed contract: map raw rows to the exact shape <TodayPlan/> expects, so a
+  // future schema rename breaks the build here instead of failing silently.
+  const planRows: TodayPlanItem[] = todayPlan.map((p) => ({
+    id: p.id,
+    title: p.title,
+    done: p.done,
+  }));
+  const planDone = planRows.filter((p) => p.done).length;
 
   const checkedIds = new Set(todayChecks.map((c) => c.goalId));
   const goalRows = activeGoals.map((g) => ({
@@ -63,16 +80,50 @@ export default async function DashboardPage() {
     emoji: g.emoji,
     checkedToday: checkedIds.has(g.id),
   }));
+  const goalsDone = goalRows.filter((g) => g.checkedToday).length;
 
+  const activeSources = sources.map((s) => ({
+    id: s.id,
+    name: s.name,
+    color: s.color,
+  }));
+
+  // buildPeriods returns newest (open, marker: null) first. The open bucket may
+  // be empty if the latest work fell in an already-closed period, so fall back
+  // to the most recent NON-EMPTY period and label the card by what it shows.
   const periods = buildPeriods(entries, markers);
-  const open = periods[0]?.totals ?? null;
+  const openPeriod = periods[0] ?? null;
+  const openIsEmpty =
+    !openPeriod ||
+    openPeriod.totals.hours + openPeriod.totals.amount === 0;
+  const shownPeriod =
+    openPeriod && !openIsEmpty
+      ? openPeriod
+      : periods.find((p) => p.totals.hours + p.totals.amount > 0) ?? null;
+  const shownIsOpen = shownPeriod !== null && shownPeriod.marker === null;
 
-  const chips: { label: string; value: string }[] = open
+  let periodLabel: string;
+  if (!shownPeriod) {
+    periodLabel = "Open period";
+  } else if (shownIsOpen) {
+    periodLabel = "Open period";
+  } else {
+    // Closed period fallback: label with its date range.
+    const start = shownPeriod.startDate;
+    const end = shownPeriod.endDate;
+    periodLabel =
+      start && end
+        ? `Period ${prettyDate(start)} – ${prettyDate(end)}`
+        : "Latest period";
+  }
+
+  const totals = shownPeriod?.totals ?? null;
+  const chips: { label: string; value: string }[] = totals
     ? [
-        { label: "Earned", value: fmtMoney(open.amount) },
-        { label: "Hours", value: fmtHours(open.hours) },
-        { label: "$/h", value: fmtMoney(open.perHour) },
-        { label: "Days worked", value: String(open.daysWorked) },
+        { label: "Earned", value: fmtMoney(totals.amount) },
+        { label: "Hours", value: fmtHours(totals.hours) },
+        { label: "$/h", value: fmtMoney(totals.perHour) },
+        { label: "Days worked", value: String(totals.daysWorked) },
       ]
     : [];
 
@@ -91,7 +142,9 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Today&rsquo;s plan</CardTitle>
+            <CardTitle>
+              Today&rsquo;s plan ({planDone}/{planRows.length} done)
+            </CardTitle>
             <CardAction>
               <Button
                 variant="ghost"
@@ -103,13 +156,16 @@ export default async function DashboardPage() {
             </CardAction>
           </CardHeader>
           <CardContent>
-            <TodayPlan items={todayPlan} />
+            <TodayPlan items={planRows} />
+            <QuickAddPlan />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Today&rsquo;s goals</CardTitle>
+            <CardTitle>
+              Today&rsquo;s goals ({goalsDone}/{goalRows.length} done)
+            </CardTitle>
             <CardAction>
               <Button
                 variant="ghost"
@@ -127,7 +183,7 @@ export default async function DashboardPage() {
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Current period</CardTitle>
+            <CardTitle>{periodLabel}</CardTitle>
             <CardAction>
               <Button
                 variant="ghost"
@@ -139,7 +195,7 @@ export default async function DashboardPage() {
             </CardAction>
           </CardHeader>
           <CardContent>
-            {chips.length > 0 && open && open.hours + open.amount > 0 ? (
+            {chips.length > 0 ? (
               <div className="flex flex-wrap gap-3">
                 {chips.map((c) => (
                   <div
@@ -155,9 +211,10 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No work logged in the open period yet.
+                No work logged yet.
               </p>
             )}
+            <QuickAddWork sources={activeSources} />
           </CardContent>
         </Card>
       </div>
