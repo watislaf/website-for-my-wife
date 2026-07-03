@@ -5,6 +5,7 @@ import {
   Briefcase,
   BarChart3,
   Activity,
+  Image,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,4 +22,5 @@ export const navItems: NavItem[] = [
   { label: "Work", href: "/admin/work", icon: Briefcase },
   { label: "Stats", href: "/admin/stats", icon: BarChart3 },
   { label: "Traffic", href: "/admin/traffic", icon: Activity },
+  { label: "Landing", href: "/admin/landing", icon: Image },
 ];

@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { landing } from "@/content/landing";
+import type { LandingContent } from "@/content/landing";
 
-export function About() {
+export function About({ content }: { content: LandingContent }) {
   return (
     <section className="mx-auto max-w-5xl px-6 py-24">
       <div className="grid items-center gap-10 md:grid-cols-2">
@@ -16,8 +16,8 @@ export function About() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={landing.portrait}
-            alt={landing.name}
+            src={content.portrait}
+            alt={content.name}
             className="h-full w-full object-cover"
           />
         </motion.div>
@@ -31,7 +31,7 @@ export function About() {
             About
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-            {landing.about}
+            {content.about}
           </p>
         </motion.div>
       </div>

@@ -19,3 +19,7 @@ export const landing = {
     { name: "Twitch", handle: "paste-later", url: "#", accent: "#9146ff" },
   ],
 };
+
+// Client-safe content type derived from the defaults above. Both server and
+// client components import this type (no server-only code here).
+export type LandingContent = typeof landing;

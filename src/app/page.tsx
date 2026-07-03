@@ -3,16 +3,19 @@ import { About } from "@/components/landing/About";
 import { Gallery } from "@/components/landing/Gallery";
 import { Socials } from "@/components/landing/Socials";
 import { PageviewBeacon } from "@/components/landing/PageviewBeacon";
+import { getLandingContent } from "@/lib/site-content";
 
-export default function Home() {
+export default async function Home() {
+  const content = await getLandingContent();
+
   return (
     <>
       <PageviewBeacon />
       <main className="flex-1">
-        <Hero />
-        <About />
-        <Gallery />
-        <Socials />
+        <Hero content={content} />
+        <About content={content} />
+        <Gallery content={content} />
+        <Socials content={content} />
       </main>
       <footer className="py-10 text-center">
         <a

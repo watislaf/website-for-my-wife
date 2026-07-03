@@ -46,6 +46,13 @@ export const periodMarkers = sqliteTable("period_markers", {
   name: text("name").notNull().default(""),
 });
 
+// Landing CMS — single-row (id=1) JSON blob of the landing content.
+export const siteContent = sqliteTable("site_content", {
+  id: integer("id").primaryKey(),
+  data: text("data").notNull(),                       // JSON string of the landing object shape
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
 // Landing analytics
 export const landingEvents = sqliteTable("landing_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
