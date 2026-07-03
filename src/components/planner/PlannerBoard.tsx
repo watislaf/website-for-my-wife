@@ -1,16 +1,20 @@
 "use client";
 
+import * as React from "react";
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import { CalendarIcon, Trash2Icon } from "lucide-react";
+import { CalendarIcon, Loader2Icon, Trash2Icon } from "lucide-react";
 
 import { addDays } from "@/lib/dates";
 import {
   createPlanItem,
   updatePlanItem,
   deletePlanItem,
+  carryOverToToday,
+  clearDoneItems,
 } from "@/actions/planner";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,27 +109,79 @@ export function PlannerBoard({
   today: string;
 }) {
   const sections = groupItems(items, today);
+  const { confirm, dialog } = useConfirm();
+  const [pending, startTransition] = useTransition();
+
+  const hasDone = items.some((i) => i.done);
+  const hasPastUndone = items.some((i) => i.date < today && !i.done);
+
+  function handleClearDone() {
+    startTransition(async () => {
+      const ok = await confirm({
+        title: "Clear done items?",
+        description: "This permanently deletes every completed plan.",
+        confirmLabel: "Clear done",
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        await clearDoneItems();
+        toast.success("Cleared done items");
+      } catch {
+        toast.error("Could not clear done items");
+      }
+    });
+  }
 
   return (
     <div className="flex flex-col gap-8">
+      {dialog}
       <AddPlanForm today={today} />
+
+      {hasDone && (
+        <div className="flex justify-end">
+          <PendingButton
+            variant="outline"
+            size="sm"
+            onClick={handleClearDone}
+            pending={pending}
+            pendingLabel="Clearing…"
+          >
+            <Trash2Icon />
+            Clear done
+          </PendingButton>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6">
         {sections.map((section) => {
-          if (section.items.length === 0) return null;
+          const showDateBadge = section.key === "week" || section.key === "later";
 
           if (section.collapsed) {
+            if (section.items.length === 0) return null;
             return (
               <details key={section.key} className="group">
                 <summary className="cursor-pointer text-sm font-semibold text-muted-foreground select-none">
                   {section.label} ({section.items.length})
                 </summary>
                 <div className="mt-3 flex flex-col gap-2">
-                  <SectionItems section={section} today={today} />
+                  {hasPastUndone && (
+                    <div className="flex justify-start">
+                      <PastCarryOverButton />
+                    </div>
+                  )}
+                  <SectionItems
+                    section={section}
+                    today={today}
+                    showDateBadge={showDateBadge}
+                  />
                 </div>
               </details>
             );
           }
+
+          // Always keep Today visible, even when empty.
+          if (section.items.length === 0 && section.key !== "today") return null;
 
           return (
             <div key={section.key} className="flex flex-col gap-2">
@@ -133,27 +189,61 @@ export function PlannerBoard({
                 {section.label}
               </h2>
               <div className="flex flex-col gap-2">
-                <SectionItems section={section} today={today} />
+                {section.items.length === 0 && section.key === "today" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nothing planned for today 🎉
+                  </p>
+                ) : (
+                  <SectionItems
+                    section={section}
+                    today={today}
+                    showDateBadge={showDateBadge}
+                  />
+                )}
               </div>
             </div>
           );
         })}
-        {items.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No plans yet. Add one above.
-          </p>
-        )}
       </div>
     </div>
+  );
+}
+
+function PastCarryOverButton() {
+  const [pending, startTransition] = useTransition();
+
+  function handleCarryOver() {
+    startTransition(async () => {
+      try {
+        await carryOverToToday();
+        toast.success("Moved unfinished to today");
+      } catch {
+        toast.error("Could not move items");
+      }
+    });
+  }
+
+  return (
+    <PendingButton
+      variant="outline"
+      size="sm"
+      onClick={handleCarryOver}
+      pending={pending}
+      pendingLabel="Moving…"
+    >
+      Move all unfinished to today
+    </PendingButton>
   );
 }
 
 function SectionItems({
   section,
   today,
+  showDateBadge,
 }: {
   section: Section;
   today: string;
+  showDateBadge: boolean;
 }) {
   return (
     <AnimatePresence initial={false}>
@@ -165,10 +255,38 @@ function SectionItems({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, height: 0 }}
         >
-          <PlanItemRow item={item} today={today} isPast={section.key === "past"} />
+          <PlanItemRow
+            item={item}
+            today={today}
+            isPast={section.key === "past"}
+            showDateBadge={showDateBadge}
+          />
         </motion.div>
       ))}
     </AnimatePresence>
+  );
+}
+
+function PendingButton({
+  pending,
+  pendingLabel,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  pending: boolean;
+  pendingLabel?: string;
+}) {
+  return (
+    <Button {...props} disabled={pending || props.disabled}>
+      {pending ? (
+        <>
+          <Loader2Icon className="animate-spin" />
+          {pendingLabel ?? "Working…"}
+        </>
+      ) : (
+        children
+      )}
+    </Button>
   );
 }
 
@@ -178,6 +296,15 @@ function AddPlanForm({ today }: { today: string }) {
   const [notes, setNotes] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // Midnight-safe: if the tab stays open past midnight, `today` changes on the
+  // next server render/revalidate. Re-seed the date so new items don't land on
+  // yesterday — but only when it's still pointing at a now-past day (untouched
+  // form). Adjusting state during render is React's recommended pattern for
+  // "reset state when a prop changes" (no cascading-render effect needed).
+  if (date < today) {
+    setDate(today);
+  }
 
   function handleAdd() {
     if (!title.trim()) {
@@ -230,9 +357,13 @@ function AddPlanForm({ today }: { today: string }) {
           }}
           className="flex-1"
         />
-        <Button onClick={handleAdd} disabled={pending}>
+        <PendingButton
+          onClick={handleAdd}
+          pending={pending}
+          pendingLabel="Adding…"
+        >
           Add
-        </Button>
+        </PendingButton>
       </div>
       <Textarea
         placeholder="Notes (optional)"
@@ -247,14 +378,19 @@ function PlanItemRow({
   item,
   today,
   isPast,
+  showDateBadge,
 }: {
   item: PlanItem;
   today: string;
   isPast: boolean;
+  showDateBadge: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
-  function toggleDone(done: boolean) {
+  function toggleDone(checked: unknown) {
+    // Base UI can emit an "indeterminate" state; only persist real booleans.
+    const done = checked === true;
     startTransition(async () => {
       try {
         await updatePlanItem(item.id, { done });
@@ -265,11 +401,11 @@ function PlanItemRow({
     });
   }
 
-  function moveToToday() {
+  function reschedule(date: string, label: string) {
     startTransition(async () => {
       try {
-        await updatePlanItem(item.id, { date: today });
-        toast.success("Moved to today");
+        await updatePlanItem(item.id, { date });
+        toast.success(label);
       } catch {
         toast.error("Could not move");
       }
@@ -277,8 +413,14 @@ function PlanItemRow({
   }
 
   function handleDelete() {
-    if (!confirm(`Delete "${item.title}"?`)) return;
     startTransition(async () => {
+      const ok = await confirm({
+        title: "Delete plan?",
+        description: `"${item.title}" will be permanently deleted.`,
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await deletePlanItem(item.id);
         toast.success("Deleted");
@@ -290,6 +432,7 @@ function PlanItemRow({
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border p-3">
+      {dialog}
       <Checkbox
         checked={item.done}
         onCheckedChange={(checked) => toggleDone(checked)}
@@ -308,13 +451,18 @@ function PlanItemRow({
           >
             {item.title}
           </span>
+          {showDateBadge && (
+            <Badge variant="secondary" className="font-normal">
+              {prettyDate(item.date)}
+            </Badge>
+          )}
           {isPast && !item.done && (
             <Badge
               variant="outline"
               render={
                 <button
                   type="button"
-                  onClick={moveToToday}
+                  onClick={() => reschedule(today, "Moved to today")}
                   disabled={pending}
                   aria-label="Move to today"
                 />
@@ -322,6 +470,24 @@ function PlanItemRow({
               className="cursor-pointer"
             >
               → today
+            </Badge>
+          )}
+          {!item.done && (
+            <Badge
+              variant="outline"
+              render={
+                <button
+                  type="button"
+                  onClick={() =>
+                    reschedule(addDays(item.date, 1), "Pushed one day")
+                  }
+                  disabled={pending}
+                  aria-label="Reschedule one day later"
+                />
+              }
+              className="cursor-pointer"
+            >
+              +1 day
             </Badge>
           )}
         </div>

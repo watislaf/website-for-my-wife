@@ -2,8 +2,9 @@
 
 import { db } from "@/db";
 import { planItems } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { todayStr } from "@/lib/dates";
 
 function revalidate() {
   revalidatePath("/admin/planner");
@@ -32,5 +33,21 @@ export async function updatePlanItem(
 
 export async function deletePlanItem(id: number) {
   await db.delete(planItems).where(eq(planItems.id, id));
+  revalidate();
+}
+
+/** Move every past, unfinished item onto today. */
+export async function carryOverToToday() {
+  const today = todayStr();
+  await db
+    .update(planItems)
+    .set({ date: today })
+    .where(and(lt(planItems.date, today), eq(planItems.done, false)));
+  revalidate();
+}
+
+/** Delete every completed item. Intentionally destructive — guard on the client. */
+export async function clearDoneItems() {
+  await db.delete(planItems).where(eq(planItems.done, true));
   revalidate();
 }
