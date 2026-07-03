@@ -10,6 +10,7 @@ import {
   saveLandingContent,
   type LandingContent,
 } from "@/lib/site-content";
+import { defaultSections, type Section } from "@/content/landing";
 
 function revalidate() {
   revalidatePath("/");
@@ -95,6 +96,96 @@ export async function setGalleryImage(
   gallery[index] = url;
   await saveLandingContent({ ...current, gallery });
   revalidate();
+}
+
+/**
+ * Persist the toggleable sections. Validates/normalizes each incoming section
+ * against the known types (dropping unknown ones and coercing to the right
+ * shape), backfills any missing type from defaults, then saves. Order is taken
+ * as-given (the manager sets it via reorder), so the public page can sort by it.
+ */
+export async function saveSections(sections: Section[]): Promise<void> {
+  const byType = new Map<string, Section>();
+  for (const s of Array.isArray(sections) ? sections : []) {
+    const norm = normalizeSection(s);
+    if (norm) byType.set(norm.type, norm);
+  }
+
+  // Ensure every known type exists (fall back to default if the client omitted
+  // one) so stored content always round-trips a full set.
+  const next = defaultSections.map((def) => byType.get(def.type) ?? def);
+
+  const current = await getLandingContent();
+  await saveLandingContent({ ...current, sections: next });
+  revalidate();
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/** Coerce an untrusted section into a valid typed Section, or null if unknown. */
+function normalizeSection(input: unknown): Section | null {
+  if (!input || typeof input !== "object") return null;
+  const s = input as Record<string, unknown>;
+  const enabled = s.enabled === true;
+  const order =
+    typeof s.order === "number" && Number.isFinite(s.order) ? s.order : 0;
+  const data = (s.data ?? {}) as Record<string, unknown>;
+
+  switch (s.type) {
+    case "video":
+      return {
+        id: "video",
+        type: "video",
+        enabled,
+        order,
+        data: { title: str(data.title).trim(), url: str(data.url).trim() },
+      };
+    case "testimonials": {
+      const items = Array.isArray(data.items) ? data.items : [];
+      return {
+        id: "testimonials",
+        type: "testimonials",
+        enabled,
+        order,
+        data: {
+          items: items.map((it) => {
+            const t = (it ?? {}) as Record<string, unknown>;
+            const role = str(t.role).trim();
+            return {
+              quote: str(t.quote).trim(),
+              author: str(t.author).trim(),
+              ...(role ? { role } : {}),
+            };
+          }),
+        },
+      };
+    }
+    case "recipes": {
+      const items = Array.isArray(data.items) ? data.items : [];
+      return {
+        id: "recipes",
+        type: "recipes",
+        enabled,
+        order,
+        data: {
+          items: items.map((it) => {
+            const r = (it ?? {}) as Record<string, unknown>;
+            const link = str(r.link).trim();
+            return {
+              title: str(r.title).trim(),
+              image: str(r.image).trim(),
+              text: str(r.text).trim(),
+              ...(link ? { link } : {}),
+            };
+          }),
+        },
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 /**

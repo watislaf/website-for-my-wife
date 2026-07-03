@@ -17,10 +17,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { SectionsManager } from "./SectionsManager";
+import type { Section } from "@/content/landing";
 
 // Local mirror of the content shape (the real type lives in a server-only
 // module; we duplicate the plain shape here so nothing server-only is imported
-// into this client component).
+// into this client component). `Section` comes from the client-safe content
+// module, so importing its type here is fine.
 type Social = { name: string; handle: string; url: string; accent: string };
 export type LandingContentProps = {
   name: string;
@@ -31,6 +34,7 @@ export type LandingContentProps = {
   portrait: string;
   gallery: string[];
   socials: Social[];
+  sections: Section[];
 };
 
 export function LandingEditor({ content }: { content: LandingContentProps }) {
@@ -39,6 +43,7 @@ export function LandingEditor({ content }: { content: LandingContentProps }) {
       <TextForm content={content} />
       <SocialsForm socials={content.socials} />
       <ImagesForm content={content} />
+      <SectionsManager sections={content.sections} />
     </div>
   );
 }
