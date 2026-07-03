@@ -133,7 +133,7 @@ export function tiltFromPointer(
   clientY: number,
   maxDeg: number,
 ): { rotateX: number; rotateY: number } {
-  const clamp = (n: number) => Math.max(-1, Math.min(1, n));
+  const clamp = (n: number) => Math.max(-0.5, Math.min(0.5, n));
   // Normalize to -0.5..0.5 across the element, then clamp to the edges.
   const px = clamp((clientX - rect.left) / rect.width - 0.5);
   const py = clamp((clientY - rect.top) / rect.height - 0.5);
