@@ -1,72 +1,117 @@
-export type WorkEntryLite = { id: number; date: string; sourceId: number; hours: number; amount: number; note: string };
+import { addDays, daysBetween } from "./dates";
+
+export type WorkDayLite = { id: number; date: string; hours: number; note: string };
+export type WorkEntryLite = { id: number; date: string; sourceId: number; amount: number; note: string };
 export type MarkerLite = { id: number; endDate: string; name: string };
+
 export type PeriodTotals = {
-  hours: number; amount: number; daysWorked: number; perHour: number;
-  bySource: Record<number, { hours: number; amount: number }>;
+  hours: number;
+  amount: number;
+  daysWorked: number;
+  perHour: number;
+  holidayDays: number | null; // null when the span is unbounded (open period)
+  bySource: Record<number, { amount: number }>;
 };
+
 export type PeriodSummary = {
   marker: MarkerLite | null;
   startDate: string | null;
   endDate: string | null;
+  days: WorkDayLite[];
   entries: WorkEntryLite[];
   totals: PeriodTotals;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-function totals(entries: WorkEntryLite[]): PeriodTotals {
-  const t: PeriodTotals = { hours: 0, amount: 0, daysWorked: 0, perHour: 0, bySource: {} };
-  const days = new Set<string>();
+/** spanStart: for a bounded period this is the day AFTER the previous marker
+ *  (exclusive lower bound + 1); for the first-ever period ("" lower) it's the
+ *  earliest logged day. `endDate` null → open period → holidayDays null. */
+function totals(
+  days: WorkDayLite[],
+  entries: WorkEntryLite[],
+  spanStart: string | null,
+  endDate: string | null,
+): PeriodTotals {
+  let hours = 0;
+  const workedDates = new Set<string>();
+  for (const d of days) {
+    hours += d.hours;
+    if (d.hours > 0) workedDates.add(d.date);
+  }
+  let amount = 0;
+  const bySource: Record<number, { amount: number }> = {};
   for (const e of entries) {
-    t.hours += e.hours;
-    t.amount += e.amount;
-    days.add(e.date);
-    const s = (t.bySource[e.sourceId] ??= { hours: 0, amount: 0 });
-    s.hours += e.hours;
-    s.amount += e.amount;
+    amount += e.amount;
+    (bySource[e.sourceId] ??= { amount: 0 }).amount += e.amount;
   }
-  t.daysWorked = days.size;
-  // perHour from the pre-rounding sums (most accurate), then round the sums to
-  // shed float drift (e.g. 0.1 + 0.2). Inputs that are already ≤2dp round to
-  // themselves, so this is a no-op for clean data.
-  t.perHour = t.hours > 0 ? round2(t.amount / t.hours) : 0;
-  t.hours = round2(t.hours);
-  t.amount = round2(t.amount);
-  for (const s of Object.values(t.bySource)) {
-    s.hours = round2(s.hours);
-    s.amount = round2(s.amount);
+  const daysWorked = workedDates.size;
+  const perHour = hours > 0 ? round2(amount / hours) : 0;
+
+  let holidayDays: number | null = null;
+  if (endDate && spanStart && spanStart <= endDate) {
+    const spanCalendarDays = daysBetween(spanStart, endDate) + 1; // inclusive
+    holidayDays = Math.max(0, spanCalendarDays - daysWorked);
+  } else if (endDate) {
+    holidayDays = 0; // bounded but no logged start → nothing to count
   }
-  return t;
+
+  hours = round2(hours);
+  amount = round2(amount);
+  for (const s of Object.values(bySource)) s.amount = round2(s.amount);
+  return { hours, amount, daysWorked, perHour, holidayDays, bySource };
 }
 
-/** All-time totals across a set of entries (rounded like period totals). */
-export function lifetimeTotals(entries: WorkEntryLite[]): PeriodTotals {
-  return totals(entries);
+/** All-time totals; unbounded span → holidayDays null. */
+export function lifetimeTotals(days: WorkDayLite[], entries: WorkEntryLite[]): PeriodTotals {
+  return totals(days, entries, null, null);
 }
 
-export function buildPeriods(entries: WorkEntryLite[], markers: MarkerLite[]): PeriodSummary[] {
+export function buildPeriods(
+  days: WorkDayLite[],
+  entries: WorkEntryLite[],
+  markers: MarkerLite[],
+): PeriodSummary[] {
   const ms = [...markers].sort((a, b) => a.endDate.localeCompare(b.endDate));
+  const ds = [...days].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   const es = [...entries].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   const out: PeriodSummary[] = [];
   let lower = ""; // exclusive lower bound; "" < every YYYY-MM-DD
+
+  const firstDate = (dd: WorkDayLite[], ee: WorkEntryLite[]): string | null => {
+    const candidates = [dd[0]?.date, ee[0]?.date].filter(Boolean) as string[];
+    return candidates.length ? candidates.sort()[0] : null;
+  };
+  const lastDate = (dd: WorkDayLite[], ee: WorkEntryLite[]): string | null => {
+    const candidates = [dd.at(-1)?.date, ee.at(-1)?.date].filter(Boolean) as string[];
+    return candidates.length ? candidates.sort().at(-1)! : null;
+  };
+
   for (const marker of ms) {
-    const bucket = es.filter((e) => e.date > lower && e.date <= marker.endDate);
+    const dBucket = ds.filter((d) => d.date > lower && d.date <= marker.endDate);
+    const eBucket = es.filter((e) => e.date > lower && e.date <= marker.endDate);
+    const spanStart = lower === "" ? firstDate(dBucket, eBucket) : addDays(lower, 1);
     out.push({
       marker,
-      startDate: bucket[0]?.date ?? null,
+      startDate: firstDate(dBucket, eBucket),
       endDate: marker.endDate,
-      entries: bucket,
-      totals: totals(bucket),
+      days: dBucket,
+      entries: eBucket,
+      totals: totals(dBucket, eBucket, spanStart, marker.endDate),
     });
     lower = marker.endDate;
   }
-  const openBucket = es.filter((e) => e.date > lower);
+
+  const openDays = ds.filter((d) => d.date > lower);
+  const openEntries = es.filter((e) => e.date > lower);
   out.push({
     marker: null,
-    startDate: openBucket[0]?.date ?? null,
-    endDate: openBucket.at(-1)?.date ?? null,
-    entries: openBucket,
-    totals: totals(openBucket),
+    startDate: firstDate(openDays, openEntries),
+    endDate: lastDate(openDays, openEntries),
+    days: openDays,
+    entries: openEntries,
+    totals: totals(openDays, openEntries, null, null), // open span unbounded
   });
+
   return out.reverse(); // newest (open) first
 }
