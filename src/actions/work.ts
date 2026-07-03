@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { incomeSources, workEntries, periodMarkers } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { incomeSources, workEntries, workDays, periodMarkers } from "@/db/schema";
+import { eq, and, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { todayStr, addDays } from "@/lib/dates";
 
@@ -21,12 +21,18 @@ function assertDate(date: string) {
   if (date > addDays(todayStr(), 365)) throw new Error("Date is too far in the future");
 }
 
-function assertEntry(data: { hours: number; amount: number; date: string; sourceId: number }) {
-  assertDate(data.date);
-  if (!Number.isFinite(data.hours) || data.hours < 0)
+type IncomeLine = { sourceId: number; amount: number; note?: string };
+
+function assertDayInput(hours: number, lines: IncomeLine[]) {
+  if (!Number.isFinite(hours) || hours < 0)
     throw new Error("Hours must be a non-negative number");
-  if (!Number.isFinite(data.amount)) throw new Error("Amount must be a finite number");
-  if (!data.sourceId) throw new Error("Source required");
+  const seen = new Set<number>();
+  for (const l of lines) {
+    if (!l.sourceId) throw new Error("Each income line needs a source");
+    if (seen.has(l.sourceId)) throw new Error("One income line per source per day");
+    seen.add(l.sourceId);
+    if (!Number.isFinite(l.amount)) throw new Error("Amount must be a finite number");
+  }
 }
 
 /* ---------- income sources ---------- */
@@ -76,50 +82,89 @@ export async function deleteSource(id: number) {
   revalidate();
 }
 
-/* ---------- work entries ---------- */
+/* ---------- work: a day + its income lines ---------- */
 
-export async function createEntry(data: {
+/**
+ * Upsert one day: its hours/note and the FULL set of income lines for that date.
+ * Lines are replaced wholesale (delete any for the date not present, upsert the
+ * rest). Clearing everything (0 hours, no lines) deletes the day.
+ */
+export async function saveDay(data: {
   date: string;
+  hours: number;
+  note?: string;
+  lines: IncomeLine[];
+}) {
+  assertDate(data.date);
+  assertDayInput(data.hours, data.lines);
+
+  if (data.hours === 0 && data.lines.length === 0) {
+    await deleteDay(data.date);
+    return;
+  }
+
+  await db
+    .insert(workDays)
+    .values({ date: data.date, hours: data.hours, note: data.note?.trim() ?? "" })
+    .onConflictDoUpdate({
+      target: workDays.date,
+      set: { hours: data.hours, note: data.note?.trim() ?? "" },
+    });
+
+  // Replace income lines for the date: delete those no longer present, upsert rest.
+  const keepIds = data.lines.map((l) => l.sourceId);
+  const existing = await db
+    .select({ sourceId: workEntries.sourceId })
+    .from(workEntries)
+    .where(eq(workEntries.date, data.date));
+  for (const row of existing) {
+    if (!keepIds.includes(row.sourceId)) {
+      await db
+        .delete(workEntries)
+        .where(and(eq(workEntries.date, data.date), eq(workEntries.sourceId, row.sourceId)));
+    }
+  }
+  for (const l of data.lines) {
+    await db
+      .insert(workEntries)
+      .values({ date: data.date, sourceId: l.sourceId, amount: l.amount, note: l.note?.trim() ?? "" })
+      .onConflictDoUpdate({
+        target: [workEntries.date, workEntries.sourceId],
+        set: { amount: l.amount, note: l.note?.trim() ?? "" },
+      });
+  }
+  revalidate();
+}
+
+export async function deleteDay(date: string) {
+  assertDate(date);
+  await db.delete(workEntries).where(eq(workEntries.date, date));
+  await db.delete(workDays).where(eq(workDays.date, date));
+  revalidate();
+}
+
+/** Dashboard quick-add for TODAY: set today's hours and upsert one income line. */
+export async function quickAddToday(data: {
   sourceId: number;
   hours: number;
   amount: number;
-  note: string;
+  note?: string;
 }) {
-  assertEntry(data);
-  await db.insert(workEntries).values({
-    date: data.date,
-    sourceId: data.sourceId,
-    hours: data.hours,
-    amount: data.amount,
-    note: data.note.trim(),
-  });
-  revalidate();
-}
+  const date = todayStr();
+  assertDayInput(data.hours, [{ sourceId: data.sourceId, amount: data.amount }]);
 
-export async function updateEntry(
-  id: number,
-  data: Partial<{
-    date: string;
-    sourceId: number;
-    hours: number;
-    amount: number;
-    note: string;
-  }>,
-) {
-  if (data.date !== undefined) assertDate(data.date);
-  if (data.hours !== undefined && (!Number.isFinite(data.hours) || data.hours < 0))
-    throw new Error("Hours must be a non-negative number");
-  if (data.amount !== undefined && !Number.isFinite(data.amount))
-    throw new Error("Amount must be a finite number");
-  if (data.sourceId !== undefined && !data.sourceId) throw new Error("Source required");
-  const patch = { ...data };
-  if (patch.note !== undefined) patch.note = patch.note.trim();
-  await db.update(workEntries).set(patch).where(eq(workEntries.id, id));
-  revalidate();
-}
+  await db
+    .insert(workDays)
+    .values({ date, hours: data.hours, note: "" })
+    .onConflictDoUpdate({ target: workDays.date, set: { hours: data.hours } });
 
-export async function deleteEntry(id: number) {
-  await db.delete(workEntries).where(eq(workEntries.id, id));
+  await db
+    .insert(workEntries)
+    .values({ date, sourceId: data.sourceId, amount: data.amount, note: data.note?.trim() ?? "" })
+    .onConflictDoUpdate({
+      target: [workEntries.date, workEntries.sourceId],
+      set: { amount: data.amount, note: data.note?.trim() ?? "" },
+    });
   revalidate();
 }
 
