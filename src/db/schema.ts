@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, unique } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const planItems = sqliteTable("plan_items", {
@@ -62,6 +62,20 @@ export const subscribers = sqliteTable("subscribers", {
   email: text("email").notNull().unique(),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
+
+// Achievements — one row per earned achievement INSTANCE. Global (one-time)
+// achievements use instanceKey="" so the UNIQUE (achievement_key, instance_key)
+// index makes re-earning a no-op (onConflictDoNothing). Repeatable achievements
+// store a per-instance key (e.g. "period:12", "source:3", "day:2026-07-01").
+// The catalog def (name, coins, tier, …) is joined in the actions layer by key.
+export const earnedAchievements = sqliteTable("earned_achievements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  achievementKey: text("achievement_key").notNull(),
+  instanceKey: text("instance_key").notNull().default(""),
+  coins: integer("coins").notNull().default(0),
+  earnedAt: text("earned_at").notNull().default(sql`(datetime('now'))`),
+  seen: integer("seen", { mode: "boolean" }).notNull().default(false),
+}, (t) => [uniqueIndex("earned_achievement_instance").on(t.achievementKey, t.instanceKey)]);
 
 // Landing analytics
 export const landingEvents = sqliteTable("landing_events", {
