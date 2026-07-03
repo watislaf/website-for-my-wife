@@ -12,7 +12,7 @@ import {
   setSourceArchived,
   updateSource,
   deleteSource,
-  createEntry,
+  saveDay,
 } from "@/actions/work";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PeriodCard } from "./PeriodCard";
@@ -28,7 +28,9 @@ import {
 } from "@/components/ui/popover";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -106,7 +108,12 @@ export function WorkBoard({
         <SourcesDialog sources={sources} />
       </div>
 
-      <QuickAddForm active={active} today={today} />
+      <DayDialog
+        active={active}
+        allSources={sources}
+        today={today}
+        trigger={<Button>Log a day</Button>}
+      />
 
       <FilterBar sources={sources} filter={filter} isFiltered={isFiltered} />
 
@@ -474,142 +481,206 @@ function SourceRow({ source }: { source: Source }) {
   );
 }
 
-/* ---------- 2. Quick add ---------- */
+/* ---------- 2. Day editor (add + edit any day) ---------- */
 
-function QuickAddForm({ active, today }: { active: Source[]; today: string }) {
-  const [date, setDate] = useState(today);
-  const [sourceId, setSourceId] = useState<number | null>(
-    active[0]?.id ?? null,
-  );
-  const [hours, setHours] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+export type DayLine = { sourceId: number; amount: string; note: string };
+
+export function DayDialog({
+  active,
+  allSources,
+  today,
+  initial,
+  trigger,
+}: {
+  active: Source[]; // selectable (non-archived) sources
+  allSources: Source[]; // for showing an existing line whose source was archived
+  today: string;
+  initial?: { date: string; hours: string; note: string; lines: DayLine[] };
+  trigger: React.ReactElement;
+}) {
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(initial?.date ?? today);
+  const [hours, setHours] = useState(initial?.hours ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [lines, setLines] = useState<DayLine[]>(initial?.lines ?? []);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function handleAdd() {
-    if (sourceId === null) {
-      toast.error("Pick a source");
+  // Re-seed on open so editing a re-bucketed row shows fresh values.
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setDate(initial?.date ?? today);
+      setHours(initial?.hours ?? "");
+      setNote(initial?.note ?? "");
+      setLines(initial?.lines ?? []);
+    }
+    setOpen(next);
+  }
+
+  const usedIds = new Set(lines.map((l) => l.sourceId));
+  const addableSources = active.filter((s) => !usedIds.has(s.id));
+
+  function addLine() {
+    const next = addableSources[0];
+    if (!next) {
+      toast.error("No more sources — add one under “Manage sources”");
       return;
     }
+    setLines((ls) => [...ls, { sourceId: next.id, amount: "", note: "" }]);
+  }
+  function setLine(i: number, patch: Partial<DayLine>) {
+    setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+  function removeLine(i: number) {
+    setLines((ls) => ls.filter((_, idx) => idx !== i));
+  }
+
+  function handleSave() {
     const h = hours === "" ? 0 : Number(hours);
-    const a = amount === "" ? 0 : Number(amount);
     if (!Number.isFinite(h) || h < 0) {
       toast.error("Hours must be a non-negative number");
       return;
     }
-    if (!Number.isFinite(a)) {
-      toast.error("Amount must be a number");
+    const parsed = lines.map((l) => ({
+      sourceId: l.sourceId,
+      amount: l.amount === "" ? 0 : Number(l.amount),
+      note: l.note,
+    }));
+    if (parsed.some((l) => !Number.isFinite(l.amount))) {
+      toast.error("Each amount must be a number");
+      return;
+    }
+    if (h === 0 && parsed.length === 0) {
+      toast.error("Enter hours or at least one income line");
       return;
     }
     startTransition(async () => {
       try {
-        await createEntry({
-          date,
-          sourceId,
-          hours: h,
-          amount: a,
-          note: note.trim(),
-        });
-        // Keep date + source for rapid multi-row entry; clear the rest.
-        setHours("");
-        setAmount("");
-        setNote("");
-        toast.success("Entry added");
+        await saveDay({ date, hours: h, note: note.trim(), lines: parsed });
+        setOpen(false);
+        toast.success("Day saved");
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not add entry");
+        toast.error(err instanceof Error ? err.message : "Could not save day");
       }
     });
   }
 
-  if (active.length === 0) {
-    return (
-      <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">
-        Add an income source first (use “Manage sources”) to log work.
-      </div>
-    );
-  }
+  const byId = new Map(allSources.map((s) => [s.id, s]));
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger
-            render={
-              <Button variant="outline" className="justify-start sm:w-44">
-                <CalendarIcon />
-                {prettyDate(date)}
-              </Button>
-            }
-          />
-          <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={strToDate(date)}
-              onSelect={(d) => {
-                if (d) setDate(dateToStr(d));
-                setCalendarOpen(false);
-              }}
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger render={trigger} />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Log a day</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3">
+          {/* Date */}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger
+              render={
+                <Button variant="outline" className="justify-start">
+                  <CalendarIcon />
+                  {prettyDate(date)}
+                </Button>
+              }
             />
-          </PopoverContent>
-        </Popover>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={strToDate(date)}
+                onSelect={(d) => {
+                  if (d) setDate(dateToStr(d));
+                  setCalendarOpen(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
 
-        <Select
-          items={active.map((s) => ({ value: s.id, label: s.name }))}
-          value={sourceId}
-          onValueChange={(v) => setSourceId(v as number)}
-        >
-          <SelectTrigger className="sm:w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {active.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                <span className="flex items-center gap-2">
-                  <span
-                    className="size-3 rounded-full"
-                    style={{ backgroundColor: s.color }}
-                    aria-hidden
+          {/* Hours (per day) */}
+          <Input
+            type="number"
+            step="0.5"
+            min="0"
+            placeholder="Hours worked this day"
+            aria-label="Hours"
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+          />
+
+          {/* Income lines */}
+          <div className="flex flex-col gap-2">
+            {lines.map((l, i) => {
+              const s = byId.get(l.sourceId);
+              // Source options for THIS line = this line's source + still-free ones.
+              const options = active.filter(
+                (o) => o.id === l.sourceId || !usedIds.has(o.id),
+              );
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <Select
+                    items={options.map((o) => ({ value: o.id, label: o.name }))}
+                    value={l.sourceId}
+                    onValueChange={(v) => setLine(i, { sourceId: v as number })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="size-3 rounded-full"
+                              style={{ backgroundColor: o.color }}
+                              aria-hidden
+                            />
+                            {o.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount"
+                    aria-label={`Amount for ${s?.name ?? "source"}`}
+                    value={l.amount}
+                    onChange={(e) => setLine(i, { amount: e.target.value })}
+                    className="w-28"
                   />
-                  {s.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeLine(i)}
+                    aria-label="Remove income line"
+                  >
+                    <XIcon />
+                  </Button>
+                </div>
+              );
+            })}
+            <Button variant="outline" size="sm" onClick={addLine} className="self-start">
+              Add income
+            </Button>
+          </div>
 
-        <Input
-          type="number"
-          step="0.5"
-          min="0"
-          placeholder="Hours"
-          aria-label="Hours"
-          value={hours}
-          onChange={(e) => setHours(e.target.value)}
-          className="sm:w-24"
-        />
-        <Input
-          type="number"
-          step="0.01"
-          placeholder="Amount"
-          aria-label="Amount"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="sm:w-28"
-        />
-        <Input
-          placeholder="Note (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
-          className="flex-1"
-        />
-        <Button onClick={handleAdd} disabled={pending}>
-          Add
-        </Button>
-      </div>
-    </div>
+          <Input
+            placeholder="Day note (optional)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <PendingButton onClick={handleSave} pending={pending} pendingLabel="Saving…">
+            Save day
+          </PendingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
