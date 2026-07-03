@@ -32,25 +32,27 @@ export function Hero({ content }: { content: LandingContent }) {
         >
           {content.subline}
         </motion.p>
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-8 flex gap-3 justify-center"
-        >
-          {content.socials.map((s) => (
-            <Button
-              key={s.name}
-              size="lg"
-              variant="secondary"
-              render={
-                <a href={s.url} onClick={() => trackClick("hero-cta")}>
-                  {s.name}
-                </a>
-              }
-            />
-          ))}
-        </motion.div>
+        {content.socials.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-8 flex gap-3 justify-center"
+          >
+            {content.socials.map((s) => (
+              <Button
+                key={s.name}
+                size="lg"
+                variant="secondary"
+                render={
+                  <a href={s.url} onClick={() => trackClick("hero-cta")}>
+                    {s.name}
+                  </a>
+                }
+              />
+            ))}
+          </motion.div>
+        )}
       </div>
     </section>
   );

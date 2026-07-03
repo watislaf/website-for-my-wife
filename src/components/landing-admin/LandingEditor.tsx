@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { UploadIcon } from "lucide-react";
+import { PlusIcon, Trash2Icon, UploadIcon } from "lucide-react";
 
 import {
   saveLandingText,
@@ -121,6 +121,17 @@ function TextForm({ content }: { content: LandingContentProps }) {
   );
 }
 
+const EMPTY_SOCIAL: Social = {
+  name: "",
+  handle: "",
+  url: "#",
+  accent: "#ec4899",
+};
+
+function isBlankSocial(s: Social): boolean {
+  return !s.name.trim() && !s.handle.trim() && (!s.url.trim() || s.url.trim() === "#");
+}
+
 function SocialsForm({ socials: initial }: { socials: Social[] }) {
   const [socials, setSocials] = useState<Social[]>(initial);
   const [pending, startTransition] = useTransition();
@@ -131,10 +142,29 @@ function SocialsForm({ socials: initial }: { socials: Social[] }) {
     );
   }
 
+  function addSocial() {
+    setSocials((prev) => [...prev, { ...EMPTY_SOCIAL }]);
+  }
+
+  function removeSocial(i: number) {
+    setSocials((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
   function handleSave() {
+    // Drop fully-empty rows and trim strings so blanks aren't persisted.
+    const cleaned = socials
+      .filter((s) => !isBlankSocial(s))
+      .map((s) => ({
+        name: s.name.trim(),
+        handle: s.handle.trim(),
+        url: s.url.trim() || "#",
+        accent: s.accent.trim() || "#ec4899",
+      }));
+
     startTransition(async () => {
       try {
-        await saveLandingSocials(socials);
+        await saveLandingSocials(cleaned);
+        setSocials(cleaned);
         toast.success("Socials saved");
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not save");
@@ -145,10 +175,15 @@ function SocialsForm({ socials: initial }: { socials: Social[] }) {
   return (
     <SectionCard title="Social links">
       <div className="flex flex-col gap-4">
+        {socials.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No social links yet. Add one below.
+          </p>
+        )}
         {socials.map((s, i) => (
           <div
             key={i}
-            className="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto] sm:items-center"
+            className="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto_auto] sm:items-center"
           >
             <Input
               aria-label="Name"
@@ -175,11 +210,26 @@ function SocialsForm({ socials: initial }: { socials: Social[] }) {
               onChange={(e) => update(i, { accent: e.target.value })}
               className="h-8 w-12 cursor-pointer rounded-lg border border-input bg-transparent"
             />
+            <Button
+              variant="destructive"
+              size="icon"
+              aria-label="Remove social"
+              title="Remove social"
+              onClick={() => removeSocial(i)}
+            >
+              <Trash2Icon />
+            </Button>
           </div>
         ))}
-        <Button className="self-start" onClick={handleSave} disabled={pending}>
-          Save socials
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" className="self-start" onClick={addSocial}>
+            <PlusIcon />
+            Add social
+          </Button>
+          <Button className="self-start" onClick={handleSave} disabled={pending}>
+            Save socials
+          </Button>
+        </div>
       </div>
     </SectionCard>
   );

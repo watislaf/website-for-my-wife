@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { trackClick } from "./track";
 
 export function Socials({ content }: { content: LandingContent }) {
+  if (content.socials.length === 0) return null;
+
   return (
     <section className="mx-auto max-w-5xl px-6 py-24">
       <h2 className="mb-10 text-center text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-pink-500 to-rose-400 bg-clip-text text-transparent">

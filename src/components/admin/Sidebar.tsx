@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
-import { landing } from "@/content/landing";
+import { ExternalLink, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navItems } from "./nav-items";
 
@@ -12,7 +11,7 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function Sidebar() {
+export function Sidebar({ siteName }: { siteName: string }) {
   const pathname = usePathname();
 
   return (
@@ -22,7 +21,7 @@ export function Sidebar() {
           👩‍🍳
         </span>
         <span className="hidden truncate font-heading text-lg font-semibold text-foreground md:inline">
-          {landing.name}
+          {siteName}
         </span>
       </div>
 
@@ -57,6 +56,17 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-border p-2">
+        <a
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View site"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/40 hover:text-accent-foreground"
+          title="View site"
+        >
+          <ExternalLink className="size-5 shrink-0" />
+          <span className="hidden md:inline">View site</span>
+        </a>
         <form action="/api/logout" method="post">
           <button
             type="submit"
