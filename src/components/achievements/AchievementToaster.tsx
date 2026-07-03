@@ -10,6 +10,10 @@ import {
 } from "@/actions/achievements";
 
 const AUTO_DISMISS_MS = 6000;
+// Cap simultaneous popups so a first sync over a data-rich account can't flood
+// the screen with dozens of toasts. Overflow is still marked seen (so it won't
+// re-pop) and remains visible on the achievements page.
+const MAX_TOASTS = 4;
 
 /**
  * Client-only toaster that syncs achievements on mount + on navigation and pops
@@ -47,9 +51,10 @@ export function AchievementToaster() {
         if (fresh.length === 0) return;
 
         for (const a of fresh) surfaced.current.add(a.id);
-        setToasts((prev) => [...prev, ...fresh]);
+        // Only pop a handful at once; overflow is still marked seen below.
+        setToasts((prev) => [...prev, ...fresh.slice(0, MAX_TOASTS)]);
 
-        // Mark seen right after surfacing so a reload won't re-pop them.
+        // Mark ALL fresh (incl. overflow) seen so nothing re-pops on reload.
         try {
           await markSeen(fresh.map((a) => a.id));
         } catch {
