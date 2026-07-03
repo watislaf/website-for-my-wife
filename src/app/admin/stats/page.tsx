@@ -25,6 +25,9 @@ import { Heatmap } from "@/components/stats/Heatmap";
 import { FilterBar } from "@/components/stats/FilterBar";
 import { SourceTable, type SourceRow } from "@/components/stats/SourceTable";
 import { GoalsStats, type GoalStat } from "@/components/stats/GoalsStats";
+import { Reveal } from "@/components/motion/Reveal";
+import { Stagger } from "@/components/motion/Stagger";
+import { CountUp } from "@/components/motion/CountUp";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -209,9 +212,24 @@ export default async function StatsPage({
   const periods = buildPeriods(allEntries, markers);
   const open = periods[0]?.totals ?? null; // newest (open) first
 
-  const stats: { label: string; value: string }[] = [
-    { label: "Total earned", value: fmtMoney(totalAmount) },
-    { label: "Avg $/h", value: totalHours > 0 ? fmtMoney(avgPerHour) : "—" },
+  const stats: {
+    label: string;
+    value: string;
+    count?: number;
+    format?: (n: number) => string;
+  }[] = [
+    {
+      label: "Total earned",
+      value: fmtMoney(totalAmount),
+      count: totalAmount,
+      format: fmtMoney,
+    },
+    {
+      label: "Avg $/h",
+      value: totalHours > 0 ? fmtMoney(avgPerHour) : "—",
+      count: totalHours > 0 ? avgPerHour : undefined,
+      format: fmtMoney,
+    },
     {
       label: "Best month",
       value: bestMonth ? `${fmtMoney(bestMonth.amount)} (${bestMonth.month})` : "—",
@@ -247,7 +265,10 @@ export default async function StatsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <Reveal
+        onMount
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
         <h1 className="text-2xl font-semibold heading-gradient">Stats</h1>
         <Button
           variant="outline"
@@ -256,7 +277,7 @@ export default async function StatsPage({
           <DownloadIcon />
           Export CSV
         </Button>
-      </div>
+      </Reveal>
 
       <FilterBar filter={{ from, to }} isFiltered={isFiltered} />
 
@@ -267,29 +288,45 @@ export default async function StatsPage({
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} size="sm">
-            <CardContent className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">{s.label}</span>
-              <span className="text-lg font-semibold">{s.value}</span>
-            </CardContent>
-          </Card>
+          <Reveal key={s.label} className="h-full">
+            <Card size="sm">
+              <CardContent className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{s.label}</span>
+                <span className="text-lg font-semibold">
+                  {s.count !== undefined && s.format ? (
+                    <CountUp value={s.count} format={s.format} />
+                  ) : (
+                    s.value
+                  )}
+                </span>
+              </CardContent>
+            </Card>
+          </Reveal>
         ))}
-      </div>
+      </Stagger>
 
-      <Charts
-        byMonth={byMonth}
-        bySourceCumulative={bySourceCumulative}
-        sources={sourceMeta}
-      />
+      <Reveal>
+        <Charts
+          byMonth={byMonth}
+          bySourceCumulative={bySourceCumulative}
+          sources={sourceMeta}
+        />
+      </Reveal>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <SourceTable rows={sourceRows} />
-        <GoalsStats goals={goalStats} />
+        <Reveal>
+          <SourceTable rows={sourceRows} />
+        </Reveal>
+        <Reveal>
+          <GoalsStats goals={goalStats} />
+        </Reveal>
       </div>
 
-      <Heatmap byDayHours={byDayHours} today={today} />
+      <Reveal>
+        <Heatmap byDayHours={byDayHours} today={today} />
+      </Reveal>
     </div>
   );
 }

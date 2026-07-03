@@ -32,6 +32,9 @@ import { TodayPlan, type TodayPlanItem } from "@/components/dashboard/TodayPlan"
 import { TodayGoals } from "@/components/dashboard/TodayGoals";
 import { QuickAddPlan } from "@/components/dashboard/QuickAddPlan";
 import { QuickAddWork } from "@/components/dashboard/QuickAddWork";
+import { Reveal } from "@/components/motion/Reveal";
+import { Stagger } from "@/components/motion/Stagger";
+import { CountUp } from "@/components/motion/CountUp";
 
 export default async function DashboardPage() {
   const today = todayStr();
@@ -118,14 +121,19 @@ export default async function DashboardPage() {
   }
 
   const totals = shownPeriod?.totals ?? null;
-  const chips: { label: string; value: string }[] = totals
-    ? [
-        { label: "Earned", value: fmtMoney(totals.amount) },
-        { label: "Hours", value: fmtHours(totals.hours) },
-        { label: "$/h", value: fmtMoney(totals.perHour) },
-        { label: "Days worked", value: String(totals.daysWorked) },
-      ]
-    : [];
+  const chips: { label: string; value: number; format: (n: number) => string }[] =
+    totals
+      ? [
+          { label: "Earned", value: totals.amount, format: fmtMoney },
+          { label: "Hours", value: totals.hours, format: fmtHours },
+          { label: "$/h", value: totals.perHour, format: fmtMoney },
+          {
+            label: "Days worked",
+            value: totals.daysWorked,
+            format: (n) => String(Math.round(n)),
+          },
+        ]
+      : [];
 
   const sections = [
     { label: "Planner", href: "/admin/planner", icon: CalendarDays },
@@ -137,9 +145,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold heading-gradient">Dashboard</h1>
+      <Reveal onMount>
+        <h1 className="text-2xl font-semibold heading-gradient">Dashboard</h1>
+      </Reveal>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <Stagger className="grid gap-6 lg:grid-cols-2">
+        <Reveal className="h-full">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -160,7 +171,9 @@ export default async function DashboardPage() {
             <QuickAddPlan />
           </CardContent>
         </Card>
+        </Reveal>
 
+        <Reveal className="h-full">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -180,8 +193,10 @@ export default async function DashboardPage() {
             <TodayGoals goals={goalRows} today={today} />
           </CardContent>
         </Card>
+        </Reveal>
 
-        <Card className="lg:col-span-2">
+        <Reveal className="lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle>{periodLabel}</CardTitle>
             <CardAction>
@@ -205,7 +220,9 @@ export default async function DashboardPage() {
                     <span className="text-xs text-muted-foreground">
                       {c.label}
                     </span>
-                    <span className="text-base font-semibold">{c.value}</span>
+                    <span className="text-base font-semibold">
+                      <CountUp value={c.value} format={c.format} />
+                    </span>
                   </div>
                 ))}
               </div>
@@ -217,7 +234,8 @@ export default async function DashboardPage() {
             <QuickAddWork sources={activeSources} />
           </CardContent>
         </Card>
-      </div>
+        </Reveal>
+      </Stagger>
 
       <div className="flex flex-wrap gap-2">
         {sections.map((s) => {
