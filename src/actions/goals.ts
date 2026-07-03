@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { goals, goalChecks } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 function revalidate() {
@@ -12,10 +12,29 @@ function revalidate() {
 
 export async function createGoal(data: { title: string; emoji: string }) {
   if (!data.title.trim()) throw new Error("Title required");
+  // Place new goals at the end: one past the current max sortOrder.
+  const existing = await db.select({ sortOrder: goals.sortOrder }).from(goals);
+  const nextOrder =
+    existing.reduce((max, g) => Math.max(max, g.sortOrder), 0) + 1;
   await db.insert(goals).values({
     title: data.title.trim(),
     emoji: data.emoji.trim() || "🎯",
+    sortOrder: nextOrder,
   });
+  revalidate();
+}
+
+export async function updateGoal(
+  id: number,
+  data: { title: string; emoji: string },
+) {
+  const title = data.title.trim();
+  if (!title) throw new Error("Title required");
+  // Only mutate title/emoji — checks (goal_checks rows) are untouched.
+  await db
+    .update(goals)
+    .set({ title, emoji: data.emoji.trim() || "🎯" })
+    .where(eq(goals.id, id));
   revalidate();
 }
 
@@ -63,6 +82,39 @@ function isUniqueConstraintError(err: unknown): boolean {
 
 export async function setGoalArchived(id: number, archived: boolean) {
   await db.update(goals).set({ archived }).where(eq(goals.id, id));
+  revalidate();
+}
+
+/**
+ * Move an active goal up or down by swapping its sortOrder with the adjacent
+ * active goal in the ordered list. No-op at the ends. Wrapped in a transaction
+ * so the two rows never share (or lose) an ordering value mid-swap.
+ */
+export async function reorderGoal(id: number, direction: "up" | "down") {
+  const active = await db
+    .select({ id: goals.id, sortOrder: goals.sortOrder })
+    .from(goals)
+    .where(eq(goals.archived, false))
+    .orderBy(asc(goals.sortOrder), asc(goals.id));
+
+  const idx = active.findIndex((g) => g.id === id);
+  if (idx === -1) return;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= active.length) return; // at an end
+
+  const a = active[idx];
+  const b = active[swapIdx];
+
+  // If two goals happen to share a sortOrder (legacy rows all default 0),
+  // a raw swap wouldn't change anything. Assign distinct values by index
+  // to guarantee the move is observable.
+  const aOrder = a.sortOrder === b.sortOrder ? idx : a.sortOrder;
+  const bOrder = a.sortOrder === b.sortOrder ? swapIdx : b.sortOrder;
+
+  await db.transaction(async (tx) => {
+    await tx.update(goals).set({ sortOrder: bOrder }).where(eq(goals.id, a.id));
+    await tx.update(goals).set({ sortOrder: aOrder }).where(eq(goals.id, b.id));
+  });
   revalidate();
 }
 

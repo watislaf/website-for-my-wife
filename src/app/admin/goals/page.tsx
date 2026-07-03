@@ -7,7 +7,7 @@ import { GoalsBoard, type GoalWithStats } from "@/components/goals/GoalsBoard";
 
 export default async function GoalsPage() {
   const [allGoals, allChecks] = await Promise.all([
-    db.select().from(goals).orderBy(asc(goals.id)),
+    db.select().from(goals).orderBy(asc(goals.sortOrder), asc(goals.id)),
     db.select().from(goalChecks),
   ]);
 
@@ -33,7 +33,7 @@ export default async function GoalsPage() {
       month: dates.filter((d) => d.startsWith(month)).length,
       cur: currentStreak(dates, today),
       best: bestStreak(dates),
-      last7: last7Days.map((d) => dateSet.has(d)),
+      last7: last7Days.map((d) => ({ date: d, checked: dateSet.has(d) })),
       checkedToday: dateSet.has(today),
     };
   }
