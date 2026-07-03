@@ -1,23 +1,59 @@
 import { db } from "@/db";
 import { incomeSources, workEntries, periodMarkers } from "@/db/schema";
 import { asc } from "drizzle-orm";
-import { buildPeriods } from "@/lib/periods";
+import { buildPeriods, lifetimeTotals } from "@/lib/periods";
 import { todayStr } from "@/lib/dates";
 import { WorkBoard } from "@/components/work/WorkBoard";
 
-export default async function WorkPage() {
-  const [sources, entries, markers] = await Promise.all([
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function firstParam(v: string | string[] | undefined): string {
+  return (Array.isArray(v) ? v[0] : v) ?? "";
+}
+
+export default async function WorkPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const sp = await searchParams;
+
+  const sourceRaw = firstParam(sp.source);
+  const sourceId = /^\d+$/.test(sourceRaw) ? Number(sourceRaw) : null;
+  const from = DATE_RE.test(firstParam(sp.from)) ? firstParam(sp.from) : "";
+  const to = DATE_RE.test(firstParam(sp.to)) ? firstParam(sp.to) : "";
+
+  const [sources, allEntries, markers] = await Promise.all([
     db.select().from(incomeSources).orderBy(asc(incomeSources.id)),
     db.select().from(workEntries).orderBy(asc(workEntries.date), asc(workEntries.id)),
     db.select().from(periodMarkers).orderBy(asc(periodMarkers.endDate)),
   ]);
 
-  const periods = buildPeriods(entries, markers);
+  // Lifetime totals are always over ALL entries, independent of the filters.
+  const lifetime = lifetimeTotals(allEntries);
+
+  // Filter the entry set, then re-bucket into periods (markers still apply).
+  const filtered = allEntries.filter((e) => {
+    if (sourceId !== null && e.sourceId !== sourceId) return false;
+    if (from && e.date < from) return false;
+    if (to && e.date > to) return false;
+    return true;
+  });
+  const isFiltered = sourceId !== null || Boolean(from) || Boolean(to);
+
+  const periods = buildPeriods(filtered, markers);
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold heading-gradient">Work</h1>
-      <WorkBoard sources={sources} periods={periods} today={todayStr()} />
+      <WorkBoard
+        sources={sources}
+        periods={periods}
+        today={todayStr()}
+        lifetime={lifetime}
+        filter={{ source: sourceId, from, to }}
+        isFiltered={isFiltered}
+      />
     </div>
   );
 }

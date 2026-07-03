@@ -12,6 +12,8 @@ export type PeriodSummary = {
   totals: PeriodTotals;
 };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 function totals(entries: WorkEntryLite[]): PeriodTotals {
   const t: PeriodTotals = { hours: 0, amount: 0, daysWorked: 0, perHour: 0, bySource: {} };
   const days = new Set<string>();
@@ -24,8 +26,22 @@ function totals(entries: WorkEntryLite[]): PeriodTotals {
     s.amount += e.amount;
   }
   t.daysWorked = days.size;
-  t.perHour = t.hours > 0 ? Math.round((t.amount / t.hours) * 100) / 100 : 0;
+  // perHour from the pre-rounding sums (most accurate), then round the sums to
+  // shed float drift (e.g. 0.1 + 0.2). Inputs that are already ≤2dp round to
+  // themselves, so this is a no-op for clean data.
+  t.perHour = t.hours > 0 ? round2(t.amount / t.hours) : 0;
+  t.hours = round2(t.hours);
+  t.amount = round2(t.amount);
+  for (const s of Object.values(t.bySource)) {
+    s.hours = round2(s.hours);
+    s.amount = round2(s.amount);
+  }
   return t;
+}
+
+/** All-time totals across a set of entries (rounded like period totals). */
+export function lifetimeTotals(entries: WorkEntryLite[]): PeriodTotals {
+  return totals(entries);
 }
 
 export function buildPeriods(entries: WorkEntryLite[], markers: MarkerLite[]): PeriodSummary[] {

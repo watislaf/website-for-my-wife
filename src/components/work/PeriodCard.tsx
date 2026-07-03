@@ -3,16 +3,24 @@
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import { CalendarIcon, ChevronDownIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 
 import type { PeriodSummary, WorkEntryLite } from "@/lib/periods";
 import {
   createMarker,
   updateMarker,
   deleteMarker,
+  createEntry,
   updateEntry,
   deleteEntry,
 } from "@/actions/work";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import type { Source } from "./WorkBoard";
 import { dateToStr, strToDate, prettyDate, fmtMoney, fmtHours } from "./format";
 
@@ -70,7 +78,7 @@ export function PeriodCard({
   const title = marker?.name
     ? marker.name
     : marker
-      ? `Period ending ${marker.endDate}`
+      ? `Period ending ${prettyDate(marker.endDate)}`
       : "Current period";
 
   const range =
@@ -122,7 +130,7 @@ export function PeriodCard({
         <Chip label={`${totals.daysWorked.toLocaleString()} days`} />
         <Chip label={fmtHours(totals.hours)} />
         <Chip label={fmtMoney(totals.amount)} />
-        <Chip label={`${fmtMoney(totals.perHour)}/h`} />
+        <Chip label={totals.hours > 0 ? `${fmtMoney(totals.perHour)}/h` : "—/h"} />
       </div>
 
       {/* Expandable body */}
@@ -164,28 +172,30 @@ export function PeriodCard({
               )}
 
               {entries.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead className="text-right">Hours</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Note</TableHead>
-                      <TableHead className="w-16 text-right">Edit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entries.map((e) => (
-                      <EntryRow
-                        key={e.id}
-                        entry={e}
-                        sources={sources}
-                        byId={byId}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead className="text-right">Hours</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Note</TableHead>
+                        <TableHead className="w-24 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {entries.map((e) => (
+                        <EntryRow
+                          key={e.id}
+                          entry={e}
+                          sources={sources}
+                          byId={byId}
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   No entries in this period.
@@ -223,11 +233,37 @@ function EntryRow({
   byId: Map<number, Source>;
 }) {
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
   const s = byId.get(entry.sourceId);
 
-  function handleDelete() {
-    if (!confirm("Delete this entry?")) return;
+  function handleDuplicate() {
     startTransition(async () => {
+      try {
+        await createEntry({
+          date: entry.date,
+          sourceId: entry.sourceId,
+          hours: entry.hours,
+          amount: entry.amount,
+          note: entry.note,
+        });
+        toast.success("Entry duplicated");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not duplicate entry",
+        );
+      }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      const ok = await confirm({
+        title: "Delete this entry?",
+        description: "This permanently removes the entry.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await deleteEntry(entry.id);
         toast.success("Entry deleted");
@@ -239,7 +275,8 @@ function EntryRow({
 
   return (
     <TableRow>
-      <TableCell>{prettyDate(entry.date)}</TableCell>
+      {dialog}
+      <TableCell className="whitespace-nowrap">{prettyDate(entry.date)}</TableCell>
       <TableCell>
         <span className="flex items-center gap-2">
           <span
@@ -252,12 +289,24 @@ function EntryRow({
       </TableCell>
       <TableCell className="text-right">{fmtHours(entry.hours)}</TableCell>
       <TableCell className="text-right">{fmtMoney(entry.amount)}</TableCell>
-      <TableCell className="max-w-40 truncate text-muted-foreground">
+      <TableCell
+        className="max-w-40 truncate text-muted-foreground"
+        title={entry.note || undefined}
+      >
         {entry.note}
       </TableCell>
       <TableCell className="text-right">
         <span className="flex justify-end gap-1">
           <EditEntryDialog entry={entry} sources={sources} />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleDuplicate}
+            disabled={pending}
+            aria-label="Duplicate entry"
+          >
+            <CopyIcon />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -526,6 +575,16 @@ function MoveMarkerDialog({
   const [name, setName] = useState(marker.name);
   const [pending, startTransition] = useTransition();
 
+  // Re-seed from the current marker each time the dialog opens; the row stays
+  // mounted across revalidations, so mount-only state would show stale values.
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setEndDate(marker.endDate);
+      setName(marker.name);
+    }
+    setOpen(next);
+  }
+
   function handleSave() {
     startTransition(async () => {
       try {
@@ -541,7 +600,7 @@ function MoveMarkerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={<Button variant="outline">Move / rename</Button>}
       />
@@ -583,15 +642,17 @@ function MoveMarkerDialog({
 
 function DeleteMarkerButton({ markerId }: { markerId: number }) {
   const [pending, startTransition] = useTransition();
+  const { confirm, dialog } = useConfirm();
 
   function handleDelete() {
-    if (
-      !confirm(
-        "Delete this marker? Its entries merge into the next (later) period.",
-      )
-    )
-      return;
     startTransition(async () => {
+      const ok = await confirm({
+        title: "Delete this marker?",
+        description: "Its entries merge into the next (later) period.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
       try {
         await deleteMarker(markerId);
         toast.success("Marker deleted");
@@ -602,9 +663,12 @@ function DeleteMarkerButton({ markerId }: { markerId: number }) {
   }
 
   return (
-    <Button variant="destructive" onClick={handleDelete} disabled={pending}>
-      Delete marker
-    </Button>
+    <>
+      {dialog}
+      <Button variant="destructive" onClick={handleDelete} disabled={pending}>
+        Delete marker
+      </Button>
+    </>
   );
 }
 

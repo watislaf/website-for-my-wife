@@ -1,14 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2Icon, Trash2Icon, XIcon } from "lucide-react";
 
-import type { PeriodSummary } from "@/lib/periods";
-import { createSource, setSourceArchived, createEntry } from "@/actions/work";
+import type { PeriodSummary, PeriodTotals } from "@/lib/periods";
+import {
+  createSource,
+  setSourceArchived,
+  updateSource,
+  deleteSource,
+  createEntry,
+} from "@/actions/work";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PeriodCard } from "./PeriodCard";
-import { dateToStr, strToDate, prettyDate } from "./format";
+import { dateToStr, strToDate, prettyDate, fmtMoney, fmtHours } from "./format";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +48,36 @@ export type Source = {
   archived: boolean;
 };
 
+export type WorkFilter = {
+  source: number | null;
+  from: string;
+  to: string;
+};
+
 /* Date + number format helpers live in ./format (shared with PeriodCard). */
+
+function PendingButton({
+  pending,
+  pendingLabel,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & {
+  pending: boolean;
+  pendingLabel?: string;
+}) {
+  return (
+    <Button {...props} disabled={pending || props.disabled}>
+      {pending ? (
+        <>
+          <Loader2Icon className="animate-spin" />
+          {pendingLabel ?? "Working…"}
+        </>
+      ) : (
+        children
+      )}
+    </Button>
+  );
+}
 
 /* ============================================================= */
 
@@ -48,22 +85,38 @@ export function WorkBoard({
   sources,
   periods,
   today,
+  lifetime,
+  filter,
+  isFiltered,
 }: {
   sources: Source[];
   periods: PeriodSummary[];
   today: string;
+  lifetime: PeriodTotals;
+  filter: WorkFilter;
+  isFiltered: boolean;
 }) {
   const active = sources.filter((s) => !s.archived);
 
   return (
     <div className="flex flex-col gap-8">
+      <LifetimeStrip lifetime={lifetime} />
+
       <div className="flex items-center justify-between">
         <SourcesDialog sources={sources} />
       </div>
 
       <QuickAddForm active={active} today={today} />
 
+      <FilterBar sources={sources} filter={filter} isFiltered={isFiltered} />
+
       <div className="flex flex-col gap-6">
+        {isFiltered && (
+          <p className="text-xs text-muted-foreground">
+            Showing a filtered view — period totals reflect only the matching
+            entries.
+          </p>
+        )}
         <AnimatePresence initial={false}>
           {periods.map((p) => (
             <motion.div key={p.marker?.id ?? "open"} layout>
@@ -71,6 +124,142 @@ export function WorkBoard({
             </motion.div>
           ))}
         </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- lifetime totals strip ---------- */
+
+function LifetimeStrip({ lifetime }: { lifetime: PeriodTotals }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-4">
+      <Stat label="Lifetime hours" value={fmtHours(lifetime.hours)} />
+      <Stat label="Lifetime earned" value={fmtMoney(lifetime.amount)} />
+      <Stat
+        label="Avg $/h"
+        value={lifetime.hours > 0 ? `${fmtMoney(lifetime.perHour)}/h` : "—"}
+      />
+      <Stat label="Days worked" value={lifetime.daysWorked.toLocaleString()} />
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="font-heading text-lg font-medium">{value}</span>
+    </div>
+  );
+}
+
+/* ---------- filter bar (drives the URL searchParams) ---------- */
+
+const ALL = "all";
+
+function FilterBar({
+  sources,
+  filter,
+  isFiltered,
+}: {
+  sources: Source[];
+  filter: WorkFilter;
+  isFiltered: boolean;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+
+  function apply(next: WorkFilter) {
+    const params = new URLSearchParams();
+    if (next.source !== null) params.set("source", String(next.source));
+    if (next.from) params.set("from", next.from);
+    if (next.to) params.set("to", next.to);
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }
+
+  const selectItems = [
+    { value: ALL, label: "All sources" },
+    ...sources.map((s) => ({ value: String(s.id), label: s.name })),
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <Select
+          items={selectItems}
+          value={filter.source === null ? ALL : String(filter.source)}
+          onValueChange={(v) =>
+            apply({ ...filter, source: v === ALL ? null : Number(v) })
+          }
+        >
+          <SelectTrigger className="sm:w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {selectItems.map((it) => (
+              <SelectItem key={it.value} value={it.value}>
+                {it.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Popover open={fromOpen} onOpenChange={setFromOpen}>
+          <PopoverTrigger
+            render={
+              <Button variant="outline" className="justify-start sm:w-44">
+                <CalendarIcon />
+                {filter.from ? prettyDate(filter.from) : "From…"}
+              </Button>
+            }
+          />
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={filter.from ? strToDate(filter.from) : undefined}
+              onSelect={(d) => {
+                apply({ ...filter, from: d ? dateToStr(d) : "" });
+                setFromOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={toOpen} onOpenChange={setToOpen}>
+          <PopoverTrigger
+            render={
+              <Button variant="outline" className="justify-start sm:w-44">
+                <CalendarIcon />
+                {filter.to ? prettyDate(filter.to) : "To…"}
+              </Button>
+            }
+          />
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={filter.to ? strToDate(filter.to) : undefined}
+              onSelect={(d) => {
+                apply({ ...filter, to: d ? dateToStr(d) : "" });
+                setToOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+
+        {isFiltered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => apply({ source: null, from: "", to: "" })}
+          >
+            <XIcon />
+            Clear filters
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -146,6 +335,10 @@ function SourcesDialog({ sources }: { sources: Source[] }) {
 
 function SourceRow({ source }: { source: Source }) {
   const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [color, setColor] = useState(source.color);
+  const { confirm, dialog } = useConfirm();
 
   function toggleArchived() {
     startTransition(async () => {
@@ -158,8 +351,96 @@ function SourceRow({ source }: { source: Source }) {
     });
   }
 
+  function startEdit() {
+    setName(source.name);
+    setColor(source.color);
+    setEditing(true);
+  }
+
+  function handleSave() {
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await updateSource(source.id, { name: name.trim(), color });
+        setEditing(false);
+        toast.success("Source updated");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not update source",
+        );
+      }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      const ok = await confirm({
+        title: "Delete source?",
+        description:
+          "This removes the source permanently. Sources with entries can't be deleted — archive them instead.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        await deleteSource(source.id);
+        toast.success("Source deleted");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not delete source",
+        );
+      }
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-border p-2">
+        {dialog}
+        <input
+          type="color"
+          aria-label="Color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="h-8 w-10 shrink-0 cursor-pointer rounded-md border border-input bg-transparent"
+        />
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          aria-label="Source name"
+          className="flex-1"
+          autoFocus
+        />
+        <PendingButton
+          size="sm"
+          onClick={handleSave}
+          pending={pending}
+          pendingLabel="Saving…"
+        >
+          Save
+        </PendingButton>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditing(false)}
+          disabled={pending}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border p-2">
+      {dialog}
       <span
         className="size-3 shrink-0 rounded-full"
         style={{ backgroundColor: source.color }}
@@ -174,8 +455,20 @@ function SourceRow({ source }: { source: Source }) {
       >
         {source.name}
       </span>
+      <Button variant="ghost" size="sm" onClick={startEdit} disabled={pending}>
+        Edit
+      </Button>
       <Button variant="ghost" size="sm" onClick={toggleArchived} disabled={pending}>
         {source.archived ? "Unarchive" : "Archive"}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={handleDelete}
+        disabled={pending}
+        aria-label="Delete source"
+      >
+        <Trash2Icon />
       </Button>
     </div>
   );
@@ -223,8 +516,8 @@ function QuickAddForm({ active, today }: { active: Source[]; today: string }) {
         setAmount("");
         setNote("");
         toast.success("Entry added");
-      } catch {
-        toast.error("Could not add entry");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not add entry");
       }
     });
   }
@@ -320,4 +613,3 @@ function QuickAddForm({ active, today }: { active: Source[]; today: string }) {
     </div>
   );
 }
-

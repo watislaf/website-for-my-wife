@@ -2,8 +2,9 @@
 
 import { db } from "@/db";
 import { incomeSources, workEntries, periodMarkers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { todayStr, addDays } from "@/lib/dates";
 
 function revalidate() {
   revalidatePath("/admin/work");
@@ -15,6 +16,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function assertDate(date: string) {
   if (!DATE_RE.test(date)) throw new Error("Invalid date");
+  // Reject absurd future dates (fat-fingered years) that would create a
+  // permanent open-period entry. Allow up to one year ahead.
+  if (date > addDays(todayStr(), 365)) throw new Error("Date is too far in the future");
 }
 
 function assertEntry(data: { hours: number; amount: number; date: string; sourceId: number }) {
@@ -38,6 +42,37 @@ export async function createSource(data: { name: string; color?: string }) {
 
 export async function setSourceArchived(id: number, archived: boolean) {
   await db.update(incomeSources).set({ archived }).where(eq(incomeSources.id, id));
+  revalidate();
+}
+
+export async function updateSource(
+  id: number,
+  data: Partial<{ name: string; color: string }>,
+) {
+  const patch: { name?: string; color?: string } = {};
+  if (data.name !== undefined) {
+    const name = data.name.trim();
+    if (!name) throw new Error("Name required");
+    patch.name = name;
+  }
+  if (data.color !== undefined) {
+    const color = data.color.trim();
+    if (color) patch.color = color;
+  }
+  if (Object.keys(patch).length === 0) return;
+  await db.update(incomeSources).set(patch).where(eq(incomeSources.id, id));
+  revalidate();
+}
+
+export async function deleteSource(id: number) {
+  // Guard: refuse to delete a source that still has work entries, which would
+  // orphan them (FK points at income_sources). Archive is the safe alternative.
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(workEntries)
+    .where(eq(workEntries.sourceId, id));
+  if (n > 0) throw new Error("Source has entries — archive it instead");
+  await db.delete(incomeSources).where(eq(incomeSources.id, id));
   revalidate();
 }
 
