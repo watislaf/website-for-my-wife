@@ -128,12 +128,35 @@ totals below.
 - **`src/app/api/export/work.csv/route.ts`** — emit the new shape: per-day
   hours plus per-source amounts (columns: date, hours, day note, then income
   lines — final column layout decided in implementation).
-- **`src/lib/achievements/engine.ts`** — its `input.entries` currently supplies
-  per-entry `hours`. Re-point `totalHours`, `distinctDays`/`total_days_worked`,
-  and the `buildPeriods` call at `work_days`. Existing metrics
+- **`src/lib/achievements/engine.ts`** + **`src/actions/achievements.ts`** —
+  the engine's `input.entries` currently supplies per-entry `hours`. Add a
+  `days: { date, hours }[]` field to `EarnInput`; re-point `totalHours`,
+  `distinctDays`/`total_days_worked`, and the `buildPeriods` call at `days`.
+  `achievements.ts` loads `work_days` and passes it in. Existing metrics
   (`total_hours`, `total_days_worked`, `period_hours`, `big-payday`, source
   earnings) keep their meaning under the new sources of truth.
 - **`src/lib/periods.ts`** — signature + totals changes above.
+- **`src/app/admin/stats/page.tsx`** — load `work_days`; source hours for
+  `byMonth`, `byDayHours` (heatmap), `totalHours`/`avgPerHour`, and the open
+  period from `work_days` instead of `work_entries.hours`. Per-source amounts
+  and cumulative charts stay from `work_entries`.
+- **`src/components/stats/SourceTable.tsx`** — **drop the `Hours` and `$/h`
+  columns** (hours are no longer per-source). `SourceRow` becomes
+  `{ name, color, amount, daysWorked }`; keep Source · Earned · Days. The stats
+  page builds these rows without per-source hours.
+- **`src/components/dashboard/QuickAddWork.tsx`** — the dashboard quick-add
+  currently calls `createEntry` with hours. Re-point it at a new
+  `quickAddToday({ sourceId, hours, amount, note })` action that **upserts
+  today's `work_days.hours`** (replacing it with the entered value) and upserts
+  the income line for that source. Keeps the same compact fields.
+
+### Design decisions folded in (consistent with the approved model)
+
+- The stats **per-source table loses hours/$/h** — hours are a day-level
+  quantity and can't be attributed to a source. It keeps earnings and days.
+- The dashboard quick-add **sets** (not adds) today's hours to the entered
+  value, matching how saving the day dialog behaves. Multiple quick-adds the
+  same day overwrite the hours but each upserts its own income line.
 
 ## Testing
 
@@ -151,6 +174,10 @@ totals below.
   from `work_days` and match hand-computed values.
 - Existing `periods.test.ts` and `achievements/engine.test.ts` updated to the
   new signatures.
+- **Stats page**: `byMonth`/heatmap/`totalHours` reflect `work_days`; the
+  per-source table shows earnings + days only (no hours column).
+- **Dashboard quick-add**: adding today upserts today's hours and one income
+  line; a second quick-add the same day overwrites hours, adds/updates its line.
 
 ## Out of scope
 
