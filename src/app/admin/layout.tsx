@@ -1,6 +1,8 @@
+import { MotionConfig } from "motion/react";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { CommandK } from "@/components/admin/CommandK";
 import { AchievementToaster } from "@/components/achievements/AchievementToaster";
+import { PageTransition } from "@/components/motion/PageTransition";
 import { getLandingContent } from "@/lib/site-content";
 import { getAchievementsState } from "@/actions/achievements";
 
@@ -22,7 +24,11 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-dvh w-full">
       <Sidebar siteName={content.name} coins={coins} />
-      <main className="flex-1 p-6 md:p-10">{children}</main>
+      <main className="flex-1 p-6 md:p-10">
+        <MotionConfig reducedMotion="user">
+          <PageTransition>{children}</PageTransition>
+        </MotionConfig>
+      </main>
       <CommandK />
       <AchievementToaster />
     </div>
