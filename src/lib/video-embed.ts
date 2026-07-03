@@ -74,6 +74,24 @@ export function toEmbedUrl(raw: string): string | null {
 }
 
 // Twitch's embedded player requires a `parent` matching the host it's embedded
-// on. We can't know the runtime host at module load, so use a sensible default;
-// the public component overrides it with the actual location when available.
+// on. We can't know the runtime host in this pure/SSR-safe helper, so emit a
+// placeholder default; the CLIENT component (VideoSection) rewrites `parent` to
+// window.location.hostname after mount via `withTwitchParent` below.
 const TWITCH_PARENT = "localhost";
+
+/**
+ * Rewrite the `parent` query param of a Twitch player embed URL to the given
+ * host. No-op for non-Twitch URLs. Safe to call with the value returned by
+ * `toEmbedUrl`. Returns the input unchanged if it isn't a valid URL.
+ */
+export function withTwitchParent(embed: string, host: string): string {
+  if (!host) return embed;
+  try {
+    const u = new URL(embed);
+    if (u.hostname !== "player.twitch.tv") return embed;
+    u.searchParams.set("parent", host);
+    return u.toString();
+  } catch {
+    return embed;
+  }
+}

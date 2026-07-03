@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 export function RecipesSection({
   data,
 }: {
-  data: RecipesSectionType["data"];
+  data?: RecipesSectionType["data"];
 }) {
-  const items = (data.items ?? []).filter((r) => r.title?.trim());
+  const items = (Array.isArray(data?.items) ? data.items : []).filter(
+    (r) => r && typeof r.title === "string" && r.title.trim(),
+  );
   if (items.length === 0) return null;
 
   return (

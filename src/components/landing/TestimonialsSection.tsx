@@ -7,9 +7,11 @@ import { Card } from "@/components/ui/card";
 export function TestimonialsSection({
   data,
 }: {
-  data: TestimonialsSectionType["data"];
+  data?: TestimonialsSectionType["data"];
 }) {
-  const items = (data.items ?? []).filter((t) => t.quote?.trim());
+  const items = (Array.isArray(data?.items) ? data.items : []).filter(
+    (t) => t && typeof t.quote === "string" && t.quote.trim(),
+  );
   if (items.length === 0) return null;
 
   return (
