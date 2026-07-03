@@ -4,6 +4,7 @@ import { asc } from "drizzle-orm";
 import { todayStr, addDays } from "@/lib/dates";
 import { currentStreak, bestStreak } from "@/lib/streaks";
 import { GoalsBoard, type GoalWithStats } from "@/components/goals/GoalsBoard";
+import { Reveal } from "@/components/motion/Reveal";
 
 export default async function GoalsPage() {
   const [allGoals, allChecks] = await Promise.all([
@@ -48,8 +49,12 @@ export default async function GoalsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold heading-gradient">Goals</h1>
-      <GoalsBoard active={active} archived={archived} today={today} />
+      <Reveal onMount>
+        <h1 className="text-2xl font-semibold heading-gradient">Goals</h1>
+      </Reveal>
+      <Reveal>
+        <GoalsBoard active={active} archived={archived} today={today} />
+      </Reveal>
     </div>
   );
 }

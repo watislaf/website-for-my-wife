@@ -8,6 +8,7 @@ import { sourceLabel, targetLabel, utmLabel } from "@/lib/traffic";
 import { Button } from "@/components/ui/button";
 import { FilterBar } from "@/components/traffic/FilterBar";
 import { TrafficBoard, type TrafficData } from "@/components/traffic/TrafficBoard";
+import { Reveal } from "@/components/motion/Reveal";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_WINDOW_DAYS = 30;
@@ -147,7 +148,10 @@ export default async function TrafficPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <Reveal
+        onMount
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
         <h1 className="text-2xl font-semibold heading-gradient">Traffic</h1>
         <Button
           variant="outline"
@@ -156,7 +160,7 @@ export default async function TrafficPage({
           <DownloadIcon />
           Export CSV
         </Button>
-      </div>
+      </Reveal>
 
       <FilterBar
         filter={{ from: isAllTime ? "" : from, to: isAllTime ? "" : to }}
@@ -164,7 +168,9 @@ export default async function TrafficPage({
         isAllTime={isAllTime}
       />
 
-      <TrafficBoard data={data} />
+      <Reveal>
+        <TrafficBoard data={data} />
+      </Reveal>
     </div>
   );
 }

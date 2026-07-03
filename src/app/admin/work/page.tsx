@@ -4,6 +4,7 @@ import { asc } from "drizzle-orm";
 import { buildPeriods, lifetimeTotals } from "@/lib/periods";
 import { todayStr } from "@/lib/dates";
 import { WorkBoard } from "@/components/work/WorkBoard";
+import { Reveal } from "@/components/motion/Reveal";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,15 +46,19 @@ export default async function WorkPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold heading-gradient">Work</h1>
-      <WorkBoard
-        sources={sources}
-        periods={periods}
-        today={todayStr()}
-        lifetime={lifetime}
-        filter={{ source: sourceId, from, to }}
-        isFiltered={isFiltered}
-      />
+      <Reveal onMount>
+        <h1 className="text-2xl font-semibold heading-gradient">Work</h1>
+      </Reveal>
+      <Reveal>
+        <WorkBoard
+          sources={sources}
+          periods={periods}
+          today={todayStr()}
+          lifetime={lifetime}
+          filter={{ source: sourceId, from, to }}
+          isFiltered={isFiltered}
+        />
+      </Reveal>
     </div>
   );
 }
