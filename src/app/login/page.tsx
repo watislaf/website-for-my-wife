@@ -8,8 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 // Only allow redirect-back to admin paths to prevent open redirects.
+// Exact "/admin" or a real subpath/query — not lookalikes like "/adminX".
 function safeNext(raw: string | null): string {
-  if (raw && raw.startsWith("/admin")) return raw;
+  if (
+    raw &&
+    (raw === "/admin" || raw.startsWith("/admin/") || raw.startsWith("/admin?"))
+  ) {
+    return raw;
+  }
   return "/admin";
 }
 
@@ -37,7 +43,7 @@ export default function LoginPage() {
           new URLSearchParams(window.location.search).get("next"),
         );
         router.push(next);
-        return; // keep loading state until navigation completes
+        return;
       }
       const data = await res.json().catch(() => ({}));
       if (res.status === 429) {
@@ -73,7 +79,10 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoFocus
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (locked) setLocked(false);
+                  }}
                   placeholder="Password"
                   className="pr-9"
                 />
