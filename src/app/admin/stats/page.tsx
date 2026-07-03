@@ -5,6 +5,7 @@ import { db } from "@/db";
 import {
   incomeSources,
   workEntries,
+  workDays,
   periodMarkers,
   goals as goalsTable,
   goalChecks,
@@ -59,12 +60,13 @@ export default async function StatsPage({
   }
   const isFiltered = Boolean(from) || Boolean(to);
 
-  const [sources, allEntries, markers, allGoals, allChecks] = await Promise.all([
+  const [sources, allEntries, allDays, markers, allGoals, allChecks] = await Promise.all([
     db.select().from(incomeSources).orderBy(asc(incomeSources.id)),
     db
       .select()
       .from(workEntries)
       .orderBy(asc(workEntries.date), asc(workEntries.id)),
+    db.select().from(workDays).orderBy(asc(workDays.date), asc(workDays.id)),
     db.select().from(periodMarkers).orderBy(asc(periodMarkers.endDate)),
     db.select().from(goalsTable).orderBy(asc(goalsTable.sortOrder), asc(goalsTable.id)),
     db.select().from(goalChecks),
@@ -80,16 +82,26 @@ export default async function StatsPage({
     if (to && e.date > to) return false;
     return true;
   });
+  const days = allDays.filter((d) => {
+    if (from && d.date < from) return false;
+    if (to && d.date > to) return false;
+    return true;
+  });
 
   // ---- byMonth: { month, hours, amount } over a CONTINUOUS month range ----
   // First bucket entries by month, then fill every month from the earliest to
   // the latest entry (gaps → 0) so a zero-activity month is NOT dropped and the
   // X-axis represents real, evenly-spaced time.
   const monthMap = new Map<string, { hours: number; amount: number }>();
-  for (const e of entries) {
-    const month = e.date.slice(0, 7); // YYYY-MM (local, no toISOString)
+  for (const d of days) {
+    const month = d.date.slice(0, 7); // YYYY-MM (local, no toISOString)
     const m = monthMap.get(month) ?? { hours: 0, amount: 0 };
-    m.hours += e.hours;
+    m.hours += d.hours;
+    monthMap.set(month, m);
+  }
+  for (const e of entries) {
+    const month = e.date.slice(0, 7);
+    const m = monthMap.get(month) ?? { hours: 0, amount: 0 };
     m.amount += e.amount;
     monthMap.set(month, m);
   }
@@ -151,15 +163,9 @@ export default async function StatsPage({
   });
 
   // ---- per-source summary table (scoped to the filter) ----
-  const perSourceAgg = new Map<
-    number,
-    { hours: number; amount: number; days: Set<string> }
-  >();
+  const perSourceAgg = new Map<number, { amount: number; days: Set<string> }>();
   for (const e of entries) {
-    const agg =
-      perSourceAgg.get(e.sourceId) ??
-      { hours: 0, amount: 0, days: new Set<string>() };
-    agg.hours += e.hours;
+    const agg = perSourceAgg.get(e.sourceId) ?? { amount: 0, days: new Set<string>() };
     agg.amount += e.amount;
     agg.days.add(e.date);
     perSourceAgg.set(e.sourceId, agg);
@@ -167,36 +173,30 @@ export default async function StatsPage({
   const sourceRows: SourceRow[] = visibleSources
     .map((s) => {
       const agg = perSourceAgg.get(s.id);
-      const hours = round2(agg?.hours ?? 0);
-      const amount = round2(agg?.amount ?? 0);
       return {
         name: s.name,
         color: s.color,
-        hours,
-        amount,
-        perHour: hours > 0 ? round2(amount / hours) : 0,
+        amount: round2(agg?.amount ?? 0),
         daysWorked: agg?.days.size ?? 0,
       };
     })
     // Only show rows with activity in the range (keeps the table meaningful).
-    .filter((r) => r.hours > 0 || r.amount > 0 || r.daysWorked > 0)
+    .filter((r) => r.amount > 0 || r.daysWorked > 0)
     .sort((a, b) => b.amount - a.amount);
 
   // ---- byDayHours for the Heatmap: trailing 53 weeks over ALL entries ----
   const rangeStart = addDays(today, -(53 * 7 - 1));
   const byDayHours: Record<string, number> = {};
-  for (const e of allEntries) {
-    if (e.date < rangeStart || e.date > today) continue;
-    byDayHours[e.date] = (byDayHours[e.date] ?? 0) + e.hours;
+  for (const d of allDays) {
+    if (d.date < rangeStart || d.date > today) continue;
+    byDayHours[d.date] = (byDayHours[d.date] ?? 0) + d.hours;
   }
 
   // ---- headline numbers (scoped to the filter) ----
   let totalAmount = 0;
+  for (const e of entries) totalAmount += e.amount;
   let totalHours = 0;
-  for (const e of entries) {
-    totalAmount += e.amount;
-    totalHours += e.hours;
-  }
+  for (const d of days) totalHours += d.hours;
   const avgPerHour = totalHours > 0 ? totalAmount / totalHours : 0;
   const bestMonthCandidate =
     byMonth.length > 0
@@ -209,7 +209,7 @@ export default async function StatsPage({
       : null;
 
   // Open period is over ALL entries (a period concept, not filter-scoped).
-  const periods = buildPeriods(allEntries, markers);
+  const periods = buildPeriods(allDays, allEntries, markers);
   const open = periods[0]?.totals ?? null; // newest (open) first
 
   const stats: {

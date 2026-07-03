@@ -10,14 +10,12 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { fmtMoney, fmtHours } from "@/components/work/format";
+import { fmtMoney } from "@/components/work/format";
 
 export type SourceRow = {
   name: string;
   color: string;
-  hours: number;
   amount: number;
-  perHour: number;
   daysWorked: number;
 };
 
@@ -37,14 +35,12 @@ export function SourceTable({ rows }: { rows: SourceRow[] }) {
 
   const totals = rows.reduce(
     (a, r) => {
-      a.hours += r.hours;
       a.amount += r.amount;
       a.days += r.daysWorked;
       return a;
     },
-    { hours: 0, amount: 0, days: 0 },
+    { amount: 0, days: 0 },
   );
-  const totalPerHour = totals.hours > 0 ? totals.amount / totals.hours : 0;
 
   return (
     <Card>
@@ -56,9 +52,7 @@ export function SourceTable({ rows }: { rows: SourceRow[] }) {
           <TableHeader>
             <TableRow>
               <TableHead>Source</TableHead>
-              <TableHead className="text-right">Hours</TableHead>
               <TableHead className="text-right">Earned</TableHead>
-              <TableHead className="text-right">$/h</TableHead>
               <TableHead className="text-right">Days</TableHead>
             </TableRow>
           </TableHeader>
@@ -75,11 +69,7 @@ export function SourceTable({ rows }: { rows: SourceRow[] }) {
                     <span className="truncate">{r.name}</span>
                   </span>
                 </TableCell>
-                <TableCell className="text-right">{fmtHours(r.hours)}</TableCell>
                 <TableCell className="text-right">{fmtMoney(r.amount)}</TableCell>
-                <TableCell className="text-right">
-                  {r.hours > 0 ? fmtMoney(r.perHour) : "—"}
-                </TableCell>
                 <TableCell className="text-right">{r.daysWorked}</TableCell>
               </TableRow>
             ))}
@@ -87,11 +77,7 @@ export function SourceTable({ rows }: { rows: SourceRow[] }) {
           <TableFooter>
             <TableRow>
               <TableCell>Total</TableCell>
-              <TableCell className="text-right">{fmtHours(totals.hours)}</TableCell>
               <TableCell className="text-right">{fmtMoney(totals.amount)}</TableCell>
-              <TableCell className="text-right">
-                {totals.hours > 0 ? fmtMoney(totalPerHour) : "—"}
-              </TableCell>
               <TableCell className="text-right">{totals.days}</TableCell>
             </TableRow>
           </TableFooter>
