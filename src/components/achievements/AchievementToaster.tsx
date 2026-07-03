@@ -74,42 +74,67 @@ export function AchievementToaster() {
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-3 px-4 sm:items-end sm:pr-6">
       <AnimatePresence initial={false}>
         {toasts.map((a) => (
-          <motion.button
+          <Toast
             key={a.id}
-            type="button"
-            layout
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            onClick={() => {
-              dismiss(a.id);
-              router.push("/admin/achievements");
-            }}
-            onAnimationComplete={() => {
-              // Schedule auto-dismiss once the entry animation settles.
-              window.setTimeout(() => dismiss(a.id), AUTO_DISMISS_MS);
-            }}
-            className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl border border-primary/30 bg-card/95 px-4 py-3 text-left shadow-lg ring-1 ring-primary/10 backdrop-blur transition-colors hover:border-primary/50"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/badges/${a.achievementKey}.svg`}
-              alt=""
-              className="size-12 shrink-0"
-            />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-                Achievement unlocked!
-              </span>
-              <span className="truncate text-sm font-semibold text-foreground">
-                {a.name}
-              </span>
-              <span className="text-xs text-muted-foreground">🪙 {a.coins}</span>
-            </span>
-          </motion.button>
+            achievement={a}
+            onDismiss={dismiss}
+            onNavigate={() => router.push("/admin/achievements")}
+          />
         ))}
       </AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * A single toast. Owns exactly one auto-dismiss timer via useEffect, cleared on
+ * unmount — no redundant timers from animation callbacks.
+ */
+function Toast({
+  achievement: a,
+  onDismiss,
+  onNavigate,
+}: {
+  achievement: UnseenAchievement;
+  onDismiss: (id: number) => void;
+  onNavigate: () => void;
+}) {
+  React.useEffect(() => {
+    const t = setTimeout(() => onDismiss(a.id), AUTO_DISMISS_MS);
+    return () => clearTimeout(t);
+    // One timer per toast id, cleared on unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.id]);
+
+  return (
+    <motion.button
+      type="button"
+      layout
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 12, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+      onClick={() => {
+        onDismiss(a.id);
+        onNavigate();
+      }}
+      className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl border border-primary/30 bg-card/95 px-4 py-3 text-left shadow-lg ring-1 ring-primary/10 backdrop-blur transition-colors hover:border-primary/50"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/badges/${a.achievementKey}.svg`}
+        alt=""
+        className="size-12 shrink-0"
+      />
+      <span className="flex min-w-0 flex-col">
+        <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+          Achievement unlocked!
+        </span>
+        <span className="truncate text-sm font-semibold text-foreground">
+          {a.name}
+        </span>
+        <span className="text-xs text-muted-foreground">🪙 {a.coins}</span>
+      </span>
+    </motion.button>
   );
 }

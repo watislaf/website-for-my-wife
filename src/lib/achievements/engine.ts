@@ -22,6 +22,14 @@ export type EarnInput = {
   distinctTrafficSources: number;
   subscribersCount: number;
   currentCoins: number; // sum of coins already earned (for the total_coins metric)
+  // Landing-page SETUP / onboarding flags (computed by the actions layer).
+  landing: {
+    nameSet: boolean;
+    aboutSet: boolean;
+    photoUploaded: boolean;
+    socialSet: boolean;
+    sectionEnabled: boolean;
+  };
   today: string;
 };
 
@@ -82,6 +90,17 @@ export function computeEarned(input: EarnInput): Earned[] {
     subscribers: input.subscribersCount,
     best_hourly_rate: bestHourlyRate,
     total_coins: input.currentCoins,
+    landing_name_set: input.landing.nameSet ? 1 : 0,
+    landing_about_set: input.landing.aboutSet ? 1 : 0,
+    landing_photo_uploaded: input.landing.photoUploaded ? 1 : 0,
+    landing_social_set: input.landing.socialSet ? 1 : 0,
+    landing_section_enabled: input.landing.sectionEnabled ? 1 : 0,
+    landing_setup_complete:
+      input.landing.nameSet &&
+      input.landing.photoUploaded &&
+      input.landing.socialSet
+        ? 1
+        : 0,
   };
 
   // ---- INSTANCE metric values (a list of {instanceKey, value} per metric) ----

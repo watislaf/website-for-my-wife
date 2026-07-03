@@ -14,6 +14,13 @@ function baseInput(over: Partial<EarnInput> = {}): EarnInput {
     distinctTrafficSources: 0,
     subscribersCount: 0,
     currentCoins: 0,
+    landing: {
+      nameSet: false,
+      aboutSet: false,
+      photoUploaded: false,
+      socialSet: false,
+      sectionEnabled: false,
+    },
     today: "2026-07-03",
     ...over,
   };
@@ -121,5 +128,64 @@ describe("computeEarned", () => {
     const k = keys(input);
     expect(k).toContain("rich-1"); // threshold 100
     expect(k).not.toContain("rich-2"); // threshold 500
+  });
+
+  it("earns no setup achievements when all landing flags are false", () => {
+    const k = keys(baseInput());
+    for (const key of [
+      "made-it-yours",
+      "storyteller",
+      "say-cheese",
+      "get-social",
+      "show-and-tell",
+      "all-set-up",
+    ]) {
+      expect(k).not.toContain(key);
+    }
+  });
+
+  it("earns core setup + all-set-up when name, photo and social are set", () => {
+    const k = keys(
+      baseInput({
+        landing: {
+          nameSet: true,
+          aboutSet: false,
+          photoUploaded: true,
+          socialSet: true,
+          sectionEnabled: false,
+        },
+      }),
+    );
+    expect(k).toContain("made-it-yours");
+    expect(k).toContain("say-cheese");
+    expect(k).toContain("get-social");
+    expect(k).toContain("all-set-up");
+    // About and section not set → those stay locked.
+    expect(k).not.toContain("storyteller");
+    expect(k).not.toContain("show-and-tell");
+  });
+
+  it("earns only show-and-tell when a section alone is enabled", () => {
+    const k = keys(
+      baseInput({
+        landing: {
+          nameSet: false,
+          aboutSet: false,
+          photoUploaded: false,
+          socialSet: false,
+          sectionEnabled: true,
+        },
+      }),
+    );
+    expect(k).toContain("show-and-tell");
+    for (const key of [
+      "made-it-yours",
+      "storyteller",
+      "say-cheese",
+      "get-social",
+      "all-set-up",
+    ]) {
+      expect(k).not.toContain(key);
+    }
   });
 });

@@ -45,6 +45,13 @@ export type MetricId =
   | "subscribers"
   | "best_hourly_rate"
   | "total_coins"
+  // SETUP / ONBOARDING (global one-time; landing-page setup flags)
+  | "landing_name_set"
+  | "landing_about_set"
+  | "landing_photo_uploaded"
+  | "landing_social_set"
+  | "landing_section_enabled"
+  | "landing_setup_complete"
   // INSTANCE (repeatable; earned once per instance whose value >= threshold)
   | "period_hours" // scope "period"
   | "period_earnings" // scope "period"
@@ -449,6 +456,86 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     hint: "Tick off your first task.",
     metric: "total_plan_done",
   }),
+
+  // ── MILESTONES: SETUP / ONBOARDING (landing-page setup) ───────────────────
+  {
+    key: "made-it-yours",
+    group: "setup",
+    tier: 1,
+    name: "Made It Yours",
+    description: "Set your name on the landing page.",
+    hint: "Put your name on it.",
+    category: "milestones",
+    metric: "landing_name_set",
+    scope: "global",
+    threshold: 1,
+    coins: 5,
+  },
+  {
+    key: "storyteller",
+    group: "setup",
+    tier: 1,
+    name: "Storyteller",
+    description: "Write your About section.",
+    hint: "Tell your story.",
+    category: "milestones",
+    metric: "landing_about_set",
+    scope: "global",
+    threshold: 1,
+    coins: 5,
+  },
+  {
+    key: "say-cheese",
+    group: "setup",
+    tier: 1,
+    name: "Say Cheese",
+    description: "Upload your first custom photo.",
+    hint: "Add a real photo.",
+    category: "milestones",
+    metric: "landing_photo_uploaded",
+    scope: "global",
+    threshold: 1,
+    coins: 5,
+  },
+  {
+    key: "get-social",
+    group: "setup",
+    tier: 1,
+    name: "Get Social",
+    description: "Add a real social link.",
+    hint: "Link a social account.",
+    category: "milestones",
+    metric: "landing_social_set",
+    scope: "global",
+    threshold: 1,
+    coins: 5,
+  },
+  {
+    key: "show-and-tell",
+    group: "setup",
+    tier: 1,
+    name: "Show & Tell",
+    description: "Enable a landing section.",
+    hint: "Turn on a section.",
+    category: "milestones",
+    metric: "landing_section_enabled",
+    scope: "global",
+    threshold: 1,
+    coins: 5,
+  },
+  {
+    key: "all-set-up",
+    group: "setup",
+    tier: 1,
+    name: "All Set Up",
+    description: "Finish the core landing setup (name, photo, and a social link).",
+    hint: "Complete your setup.",
+    category: "milestones",
+    metric: "landing_setup_complete",
+    scope: "global",
+    threshold: 1,
+    coins: 20,
+  },
 
   // ── MILESTONES: meta / coins (kept in milestones so it stays balanced) ────
   ...family({

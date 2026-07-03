@@ -16,6 +16,8 @@ import { and, eq, count, sum, inArray, sql } from "drizzle-orm";
 import { todayStr } from "@/lib/dates";
 import { computeEarned } from "@/lib/achievements/engine";
 import { achievementByKey, type Category } from "@/lib/achievements/catalog";
+import { getLandingContent } from "@/lib/site-content";
+import { landing } from "@/content/landing";
 
 // The catalog def fields the client needs to pop a toast for a newly-earned row.
 export type UnseenAchievement = {
@@ -83,6 +85,37 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
 
     const currentCoins = Number(coinsRows[0]?.total ?? 0);
 
+    // ---- Landing-page SETUP / onboarding flags (never throws) ----
+    let landingFlags = {
+      nameSet: false,
+      aboutSet: false,
+      photoUploaded: false,
+      socialSet: false,
+      sectionEnabled: false,
+    };
+    try {
+      const content = await getLandingContent();
+      landingFlags = {
+        nameSet:
+          content.name.trim() !== "" && content.name.trim() !== landing.name,
+        aboutSet:
+          content.about.trim() !== "" && content.about.trim() !== landing.about,
+        photoUploaded: [
+          content.heroImage,
+          content.portrait,
+          ...content.gallery,
+        ].some((u) => typeof u === "string" && u.startsWith("/api/media/")),
+        socialSet: content.socials.some(
+          (s) => s.url && s.url.trim() !== "" && s.url.trim() !== "#",
+        ),
+        sectionEnabled:
+          Array.isArray(content.sections) &&
+          content.sections.some((s) => s.enabled),
+      };
+    } catch (err) {
+      console.error("landing flags computation failed", err);
+    }
+
     const earned = computeEarned({
       entries,
       markers,
@@ -95,6 +128,7 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
       distinctTrafficSources: Number(distinctSourceRows[0]?.n ?? 0),
       subscribersCount: subsRows[0]?.n ?? 0,
       currentCoins,
+      landing: landingFlags,
       today: todayStr(),
     });
 
