@@ -25,12 +25,13 @@ const UPLOAD_DIR = path.join(
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
 
+// SVG deliberately excluded — an uploaded .svg served same-origin is executable
+// script (stored XSS). Only raster formats are accepted.
 const EXT_BY_TYPE: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
-  "image/svg+xml": ".svg",
 };
 
 type GalleryField = "heroImage" | "portrait";

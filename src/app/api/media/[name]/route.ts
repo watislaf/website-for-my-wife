@@ -15,13 +15,15 @@ const UPLOAD_DIR = path.join(
   "uploads",
 );
 
+// SVG deliberately excluded: an uploaded .svg served same-origin is executable
+// script (stored XSS). Shipped default SVGs live in /public and are served by
+// Next directly, not through this route.
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
   ".gif": "image/gif",
-  ".svg": "image/svg+xml",
 };
 
 export async function GET(

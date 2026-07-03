@@ -5,6 +5,10 @@ import { Socials } from "@/components/landing/Socials";
 import { PageviewBeacon } from "@/components/landing/PageviewBeacon";
 import { getLandingContent } from "@/lib/site-content";
 
+// Reads live CMS content from the DB — must not be statically prerendered, or
+// edits would freeze at build time and revert on every redeploy.
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const content = await getLandingContent();
 
