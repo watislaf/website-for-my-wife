@@ -13,6 +13,7 @@ import { db } from "@/db";
 import {
   incomeSources,
   workEntries,
+  workDays,
   periodMarkers,
   goals,
   goalChecks,
@@ -51,18 +52,13 @@ async function main() {
   };
   const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)];
 
-  const entries: {
-    date: string;
-    sourceId: number;
-    hours: number;
-    amount: number;
-    note: string;
-  }[] = [];
+  const dayHours = new Map<string, number>(); // date -> total hours
+  const entries: { date: string; sourceId: number; amount: number; note: string }[] = [];
 
   const clientNotes = ["Feature work", "Bug fixes", "Meetings + review", "Refactor"];
   const streamNotes = ["Evening stream", "Cooking stream", "Q&A stream", "Collab"];
 
-  // Walk back ~90 days; work roughly 3 of every 5 days, occasionally twice a day.
+  // Walk back ~90 days; work roughly 3 of every 5 days, occasionally two sources.
   let dayOffset = 0;
   while (entries.length < 40 && dayOffset < 92) {
     const date = addDays(today, -dayOffset);
@@ -70,33 +66,28 @@ async function main() {
     // Skip ~40% of days so daysWorked < calendar days (realistic).
     if (rand() < 0.4) continue;
 
+    let hoursToday = 0;
     // Client A: steady weekday-ish work, ~4-8h at ~$45-70/h.
     if (rand() < 0.65) {
       const hours = Math.round((3 + rand() * 5) * 2) / 2; // 3.0–8.0 in .5 steps
       const rate = 45 + Math.round(rand() * 25);
-      entries.push({
-        date,
-        sourceId: clientA.id,
-        hours,
-        amount: Math.round(hours * rate),
-        note: pick(clientNotes),
-      });
+      hoursToday += hours;
+      entries.push({ date, sourceId: clientA.id, amount: Math.round(hours * rate), note: pick(clientNotes) });
     }
 
     // Streaming: shorter, lumpier income; sometimes same day as client work.
     if (rand() < 0.5) {
       const hours = Math.round((1.5 + rand() * 3) * 2) / 2; // 1.5–4.5
-      const amount = Math.round(20 + rand() * 180); // tips/subs vary a lot
-      entries.push({
-        date,
-        sourceId: streaming.id,
-        hours,
-        amount,
-        note: pick(streamNotes),
-      });
+      hoursToday += hours;
+      entries.push({ date, sourceId: streaming.id, amount: Math.round(20 + rand() * 180), note: pick(streamNotes) });
     }
+
+    if (hoursToday > 0) dayHours.set(date, (dayHours.get(date) ?? 0) + hoursToday);
   }
 
+  if (dayHours.size > 0) {
+    await db.insert(workDays).values([...dayHours].map(([date, hours]) => ({ date, hours, note: "" })));
+  }
   await db.insert(workEntries).values(entries);
 
   // ---- 3. one period marker at the start of the current month ----

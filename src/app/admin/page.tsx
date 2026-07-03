@@ -14,6 +14,7 @@ import {
   goals,
   goalChecks,
   workEntries,
+  workDays,
   periodMarkers,
   incomeSources,
 } from "@/db/schema";
@@ -39,7 +40,7 @@ import { CountUp } from "@/components/motion/CountUp";
 export default async function DashboardPage() {
   const today = todayStr();
 
-  const [todayPlan, activeGoals, todayChecks, entries, markers, sources] =
+  const [todayPlan, activeGoals, todayChecks, entries, dayRows, markers, sources] =
     await Promise.all([
       db
         .select()
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
         .select()
         .from(workEntries)
         .orderBy(asc(workEntries.date), asc(workEntries.id)),
+      db.select().from(workDays).orderBy(asc(workDays.date), asc(workDays.id)),
       db.select().from(periodMarkers).orderBy(asc(periodMarkers.endDate)),
       db
         .select()
@@ -94,7 +96,7 @@ export default async function DashboardPage() {
   // buildPeriods returns newest (open, marker: null) first. The open bucket may
   // be empty if the latest work fell in an already-closed period, so fall back
   // to the most recent NON-EMPTY period and label the card by what it shows.
-  const periods = buildPeriods(entries, markers);
+  const periods = buildPeriods(dayRows, entries, markers);
   const openPeriod = periods[0] ?? null;
   const openIsEmpty =
     !openPeriod ||

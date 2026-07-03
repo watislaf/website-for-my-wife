@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { createEntry } from "@/actions/work";
-import { todayStr } from "@/lib/dates";
+import { quickAddToday } from "@/actions/work";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,13 +42,7 @@ export function QuickAddWork({ sources }: { sources: QuickAddSource[] }) {
     }
     startTransition(async () => {
       try {
-        await createEntry({
-          date: todayStr(),
-          sourceId,
-          hours: h,
-          amount: a,
-          note: note.trim(),
-        });
+        await quickAddToday({ sourceId, hours: h, amount: a, note: note.trim() });
         setHours("");
         setAmount("");
         setNote("");
