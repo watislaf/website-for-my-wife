@@ -54,6 +54,15 @@ export const siteContent = sqliteTable("site_content", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });
 
+// Newsletter subscribers — voluntarily submitted emails (distinct from the
+// anonymous landingEvents analytics). `email` is unique so re-subscribing is a
+// no-op (the /api/subscribe route treats a unique-constraint hit as success).
+export const subscribers = sqliteTable("subscribers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
 // Landing analytics
 export const landingEvents = sqliteTable("landing_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),

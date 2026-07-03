@@ -183,6 +183,20 @@ function normalizeSection(input: unknown): Section | null {
         },
       };
     }
+    case "newsletter": {
+      const buttonLabel = str(data.buttonLabel).trim();
+      return {
+        id: "newsletter",
+        type: "newsletter",
+        enabled,
+        order,
+        data: {
+          heading: str(data.heading).trim(),
+          text: str(data.text).trim(),
+          ...(buttonLabel ? { buttonLabel } : {}),
+        },
+      };
+    }
     default:
       return null;
   }

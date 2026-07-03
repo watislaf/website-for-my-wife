@@ -36,10 +36,27 @@ export type RecipesSection = {
   data: { items: RecipeItem[] };
 };
 
-export type Section = VideoSection | TestimonialsSection | RecipesSection;
+export type NewsletterSection = {
+  id: "newsletter";
+  type: "newsletter";
+  enabled: boolean;
+  order: number;
+  data: { heading: string; text: string; buttonLabel?: string };
+};
+
+export type Section =
+  | VideoSection
+  | TestimonialsSection
+  | RecipesSection
+  | NewsletterSection;
 
 /** Every section type we know about — the manager always shows all of these. */
-export const SECTION_TYPES = ["video", "testimonials", "recipes"] as const;
+export const SECTION_TYPES = [
+  "video",
+  "testimonials",
+  "recipes",
+  "newsletter",
+] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
 // Default sections: all present but DISABLED so the live page is unchanged until
@@ -84,6 +101,17 @@ export const defaultSections: Section[] = [
           link: "",
         },
       ],
+    },
+  },
+  {
+    id: "newsletter",
+    type: "newsletter",
+    enabled: false,
+    order: 3,
+    data: {
+      heading: "Get my recipes in your inbox",
+      text: "No spam, just the good stuff.",
+      buttonLabel: "Subscribe",
     },
   },
 ];

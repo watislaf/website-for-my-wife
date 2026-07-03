@@ -5,6 +5,7 @@ import { Socials } from "@/components/landing/Socials";
 import { VideoSection } from "@/components/landing/VideoSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { RecipesSection } from "@/components/landing/RecipesSection";
+import { NewsletterSection } from "@/components/landing/NewsletterSection";
 import { PageviewBeacon } from "@/components/landing/PageviewBeacon";
 import { getLandingContent } from "@/lib/site-content";
 import type { Section } from "@/content/landing";
@@ -17,6 +18,8 @@ function renderSection(section: Section) {
       return <TestimonialsSection key={section.id} data={section.data} />;
     case "recipes":
       return <RecipesSection key={section.id} data={section.data} />;
+    case "newsletter":
+      return <NewsletterSection key={section.id} data={section.data} />;
     default:
       return null;
   }

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { SectionsManager } from "./SectionsManager";
+import { SectionsManager, type SubscriberInfo } from "./SectionsManager";
 import type { Section } from "@/content/landing";
 
 // Local mirror of the content shape (the real type lives in a server-only
@@ -37,13 +37,25 @@ export type LandingContentProps = {
   sections: Section[];
 };
 
-export function LandingEditor({ content }: { content: LandingContentProps }) {
+export function LandingEditor({
+  content,
+  subscriberCount = 0,
+  recentSubscribers = [],
+}: {
+  content: LandingContentProps;
+  subscriberCount?: number;
+  recentSubscribers?: SubscriberInfo[];
+}) {
   return (
     <div className="flex flex-col gap-8">
       <TextForm content={content} />
       <SocialsForm socials={content.socials} />
       <ImagesForm content={content} />
-      <SectionsManager sections={content.sections} />
+      <SectionsManager
+        sections={content.sections}
+        subscriberCount={subscriberCount}
+        recentSubscribers={recentSubscribers}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  DownloadIcon,
   PlusIcon,
   Trash2Icon,
   UploadIcon,
@@ -24,9 +25,21 @@ const TITLES: Record<Section["type"], string> = {
   video: "Video",
   testimonials: "Testimonials",
   recipes: "Recipes",
+  newsletter: "Newsletter",
 };
 
-export function SectionsManager({ sections: initial }: { sections: Section[] }) {
+/** Plain (client-safe) shape of a subscriber row for the admin panel. */
+export type SubscriberInfo = { email: string; createdAt: string };
+
+export function SectionsManager({
+  sections: initial,
+  subscriberCount = 0,
+  recentSubscribers = [],
+}: {
+  sections: Section[];
+  subscriberCount?: number;
+  recentSubscribers?: SubscriberInfo[];
+}) {
   // Keep local sections sorted by order so up/down maps to array position.
   const [sections, setSections] = useState<Section[]>(() =>
     [...initial].sort((a, b) => a.order - b.order),
@@ -136,6 +149,8 @@ export function SectionsManager({ sections: initial }: { sections: Section[] }) 
                 <SectionEditor
                   section={s}
                   onChange={(data) => updateData(s.id, data)}
+                  subscriberCount={subscriberCount}
+                  recentSubscribers={recentSubscribers}
                 />
                 <Button
                   className="mt-4"
@@ -156,9 +171,13 @@ export function SectionsManager({ sections: initial }: { sections: Section[] }) 
 function SectionEditor({
   section,
   onChange,
+  subscriberCount,
+  recentSubscribers,
 }: {
   section: Section;
   onChange: (data: Section["data"]) => void;
+  subscriberCount: number;
+  recentSubscribers: SubscriberInfo[];
 }) {
   switch (section.type) {
     case "video":
@@ -167,6 +186,15 @@ function SectionEditor({
       return <TestimonialsEditor data={section.data} onChange={onChange} />;
     case "recipes":
       return <RecipesEditor data={section.data} onChange={onChange} />;
+    case "newsletter":
+      return (
+        <NewsletterEditor
+          data={section.data}
+          onChange={onChange}
+          subscriberCount={subscriberCount}
+          recentSubscribers={recentSubscribers}
+        />
+      );
     default:
       return null;
   }
@@ -347,6 +375,83 @@ function RecipesEditor({
         <PlusIcon />
         Add recipe
       </Button>
+    </div>
+  );
+}
+
+type NewsletterData = Extract<Section, { type: "newsletter" }>["data"];
+function NewsletterEditor({
+  data,
+  onChange,
+  subscriberCount,
+  recentSubscribers,
+}: {
+  data: NewsletterData;
+  onChange: (d: NewsletterData) => void;
+  subscriberCount: number;
+  recentSubscribers: SubscriberInfo[];
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="newsletter-heading">Heading</Label>
+        <Input
+          id="newsletter-heading"
+          value={data.heading}
+          onChange={(e) => onChange({ ...data, heading: e.target.value })}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="newsletter-text">Text</Label>
+        <Textarea
+          id="newsletter-text"
+          value={data.text}
+          onChange={(e) => onChange({ ...data, text: e.target.value })}
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="newsletter-button">Button label (optional)</Label>
+        <Input
+          id="newsletter-button"
+          placeholder="Subscribe"
+          value={data.buttonLabel ?? ""}
+          onChange={(e) => onChange({ ...data, buttonLabel: e.target.value })}
+        />
+      </div>
+
+      <div className="rounded-lg border border-border p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">
+            Subscribers{" "}
+            <span className="text-muted-foreground">({subscriberCount})</span>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            render={<a href="/api/export/subscribers.csv" download />}
+          >
+            <DownloadIcon />
+            Export subscribers
+          </Button>
+        </div>
+        {recentSubscribers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No subscribers yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-1 text-sm">
+            {recentSubscribers.map((s) => (
+              <li
+                key={s.email}
+                className="flex flex-wrap items-baseline justify-between gap-2"
+              >
+                <span className="font-mono">{s.email}</span>
+                <span className="text-xs text-muted-foreground">
+                  {s.createdAt}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
