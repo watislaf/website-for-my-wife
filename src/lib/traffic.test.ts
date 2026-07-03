@@ -27,6 +27,19 @@ describe("resolveSource", () => {
     expect(resolveSource(null, "https://youtu.be/x")).toBe("youtube");
     expect(resolveSource(null, "https://facebook.com/x")).toBe("facebook");
     expect(resolveSource(null, "https://m.facebook.com/x")).toBe("facebook");
+    expect(resolveSource(null, "https://linkedin.com/x")).toBe("linkedin");
+    expect(resolveSource(null, "https://lnkd.in/x")).toBe("linkedin");
+    expect(resolveSource(null, "https://pinterest.com/x")).toBe("pinterest");
+    expect(resolveSource(null, "https://pin.it/x")).toBe("pinterest");
+    expect(resolveSource(null, "https://reddit.com/r/x")).toBe("reddit");
+  });
+
+  it("maps search engines to 'search'", () => {
+    expect(resolveSource(null, "https://www.google.com/")).toBe("search");
+    expect(resolveSource(null, "https://google.com/search?q=x")).toBe("search");
+    expect(resolveSource(null, "https://google.co.uk/")).toBe("search");
+    expect(resolveSource(null, "https://www.bing.com/")).toBe("search");
+    expect(resolveSource(null, "https://duckduckgo.com/")).toBe("search");
   });
 
   it("matches known hosts case-insensitively", () => {

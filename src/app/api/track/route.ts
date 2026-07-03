@@ -36,9 +36,15 @@ export async function POST(req: Request) {
 
   const rawTarget = (body as { target?: unknown }).target;
   const rawUtm = (body as { utmSource?: unknown }).utmSource;
+  const rawUtmMedium = (body as { utmMedium?: unknown }).utmMedium;
+  const rawUtmCampaign = (body as { utmCampaign?: unknown }).utmCampaign;
   // Cap stored string lengths so a hostile caller can't POST a multi-MB value
-  // (inserted verbatim + would pollute the clicksByTarget aggregation).
-  const utmSource = typeof rawUtm === "string" ? rawUtm.slice(0, 128) : null;
+  // (inserted verbatim + would pollute the aggregations).
+  const cap = (v: unknown): string | null =>
+    typeof v === "string" && v.length > 0 ? v.slice(0, 128) : null;
+  const utmSource = cap(rawUtm);
+  const utmMedium = cap(rawUtmMedium);
+  const utmCampaign = cap(rawUtmCampaign);
   const target =
     type === "click" && typeof rawTarget === "string" ? rawTarget.slice(0, 128) : "";
 
@@ -46,7 +52,7 @@ export async function POST(req: Request) {
     const source = resolveSource(utmSource, req.headers.get("referer"));
     await db
       .insert(landingEvents)
-      .values({ type, source, target, date: todayStr() });
+      .values({ type, source, target, utmMedium, utmCampaign, date: todayStr() });
   } catch {
     /* analytics must never break the page — swallow and still 204 */
   }

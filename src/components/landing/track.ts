@@ -1,9 +1,18 @@
-type Body = { type: "pageview" | "click"; target?: string; utmSource?: string | null };
+type Body = {
+  type: "pageview" | "click";
+  target?: string;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+};
 
 function send(body: Body) {
   try {
-    const utmSource = new URLSearchParams(window.location.search).get("utm_source");
-    const payload = JSON.stringify({ ...body, utmSource });
+    const params = new URLSearchParams(window.location.search);
+    const utmSource = params.get("utm_source");
+    const utmMedium = params.get("utm_medium");
+    const utmCampaign = params.get("utm_campaign");
+    const payload = JSON.stringify({ ...body, utmSource, utmMedium, utmCampaign });
     if (navigator.sendBeacon) {
       navigator.sendBeacon("/api/track", new Blob([payload], { type: "application/json" }));
     } else {

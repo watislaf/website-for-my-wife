@@ -16,14 +16,20 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export type TrafficData = {
-  totals: { views: number; clicks: number; ctr: number };
-  viewsBySource: { source: string; count: number }[];
-  clicksByTarget: { target: string; count: number }[];
-  clicksBySource: { source: string; count: number }[];
-  last30: { date: string; views: number; clicks: number }[];
+  totals: { views: number; clicks: number; clicksPerView: number };
+  viewsBySource: { source: string; label: string; count: number }[];
+  clicksByTarget: { target: string; label: string; count: number }[];
+  clicksBySource: { source: string; label: string; count: number }[];
+  byCampaign: { campaign: string; count: number }[];
+  trend: { date: string; views: number; clicks: number }[];
+  windowLabel: string;
 };
 
 const AXIS = "var(--muted-foreground)";
+// Views keep the theme pink; clicks get a distinct indigo accent (the theme's
+// chart palette is all pinks, so use an explicit contrasting hue).
+const VIEWS_COLOR = "var(--primary)";
+const CLICKS_COLOR = "#6366f1";
 
 function TooltipBox({
   label,
@@ -50,13 +56,21 @@ function shortDay(date: string): string {
 }
 
 export function TrafficBoard({ data }: { data: TrafficData }) {
-  const { totals, viewsBySource, clicksByTarget, clicksBySource, last30 } = data;
+  const {
+    totals,
+    viewsBySource,
+    clicksByTarget,
+    clicksBySource,
+    byCampaign,
+    trend,
+    windowLabel,
+  } = data;
 
   if (totals.views === 0 && totals.clicks === 0) {
     return (
       <Card>
         <CardContent className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
-          No visitors tracked yet — share your link 📣
+          No visitors tracked in {windowLabel} — share your link 📣
         </CardContent>
       </Card>
     );
@@ -65,17 +79,28 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
   const stats = [
     { label: "Pageviews", value: totals.views.toLocaleString() },
     { label: "Link clicks", value: totals.clicks.toLocaleString() },
-    { label: "Click-through rate", value: `${(totals.ctr * 100).toFixed(1)}%` },
+    {
+      label: "Clicks per view",
+      value: `${(totals.clicksPerView * 100).toFixed(1)}%`,
+      hint: "clicks ÷ views — can exceed 100%",
+    },
   ];
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-xs text-muted-foreground">
+        Showing {windowLabel}. Totals and charts are scoped to this window.
+      </p>
+
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label} size="sm">
             <CardContent className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">{s.label}</span>
               <span className="text-lg font-semibold">{s.value}</span>
+              {s.hint && (
+                <span className="text-[10px] text-muted-foreground">{s.hint}</span>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -102,7 +127,7 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
                   <XAxis type="number" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <YAxis
                     type="category"
-                    dataKey="source"
+                    dataKey="label"
                     tick={{ fontSize: 11, fill: AXIS }}
                     tickLine={false}
                     axisLine={false}
@@ -118,7 +143,7 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
                       ) : null
                     }
                   />
-                  <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} maxBarSize={28} />
+                  <Bar dataKey="count" fill={VIEWS_COLOR} radius={[0, 4, 4, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -145,7 +170,7 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
                   <XAxis type="number" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <YAxis
                     type="category"
-                    dataKey="target"
+                    dataKey="label"
                     tick={{ fontSize: 11, fill: AXIS }}
                     tickLine={false}
                     axisLine={false}
@@ -161,7 +186,7 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
                       ) : null
                     }
                   />
-                  <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} maxBarSize={28} />
+                  <Bar dataKey="count" fill={CLICKS_COLOR} radius={[0, 4, 4, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -184,7 +209,7 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
                     key={c.source}
                     className="flex items-center justify-between gap-2 text-sm"
                   >
-                    <span className="truncate">{c.source}</span>
+                    <span className="truncate">{c.label}</span>
                     <span className="font-medium tabular-nums">{c.count}</span>
                   </li>
                 ))}
@@ -195,69 +220,92 @@ export function TrafficBoard({ data }: { data: TrafficData }) {
 
         <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Last 30 days</CardTitle>
+            <CardTitle>By campaign</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={last30} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={shortDay}
-                  tick={{ fontSize: 11, fill: AXIS }}
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={24}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: AXIS }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={32}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) =>
-                    active && payload?.length ? (
-                      <TooltipBox label={shortDay(label as string)}>
-                        <div className="flex flex-col gap-0.5">
-                          {payload.map((p) => (
-                            <div key={p.name} className="flex items-center gap-1.5">
-                              <span
-                                className="size-2 rounded-full"
-                                style={{ backgroundColor: p.color as string }}
-                              />
-                              <span>{p.name}:</span>
-                              <span className="font-medium">{Number(p.value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </TooltipBox>
-                    ) : null
-                  }
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line
-                  type="monotone"
-                  dataKey="views"
-                  name="Views"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="clicks"
-                  name="Clicks"
-                  stroke="var(--muted-foreground)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {byCampaign.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No events yet.</div>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {byCampaign.map((c) => (
+                  <li
+                    key={c.campaign}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="truncate">{c.campaign}</span>
+                    <span className="font-medium tabular-nums">{c.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Trend</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={shortDay}
+                tick={{ fontSize: 11, fill: AXIS }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={24}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS }}
+                tickLine={false}
+                axisLine={false}
+                width={32}
+                allowDecimals={false}
+              />
+              <Tooltip
+                content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <TooltipBox label={shortDay(label as string)}>
+                      <div className="flex flex-col gap-0.5">
+                        {payload.map((p) => (
+                          <div key={p.name} className="flex items-center gap-1.5">
+                            <span
+                              className="size-2 rounded-full"
+                              style={{ backgroundColor: p.color as string }}
+                            />
+                            <span>{p.name}:</span>
+                            <span className="font-medium">{Number(p.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TooltipBox>
+                  ) : null
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line
+                type="monotone"
+                dataKey="views"
+                name="Views"
+                stroke={VIEWS_COLOR}
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="clicks"
+                name="Clicks"
+                stroke={CLICKS_COLOR}
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }

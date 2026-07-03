@@ -2,7 +2,7 @@
 // it stays trivially unit-testable.
 
 // Known referer hostnames → coarse source label.
-const HOST_SOURCES: Record<string, string> = {
+export const HOST_SOURCES: Record<string, string> = {
   "instagram.com": "instagram",
   "l.instagram.com": "instagram",
   "tiktok.com": "tiktok",
@@ -13,7 +13,18 @@ const HOST_SOURCES: Record<string, string> = {
   "youtu.be": "youtube",
   "facebook.com": "facebook",
   "m.facebook.com": "facebook",
+  "linkedin.com": "linkedin",
+  "lnkd.in": "linkedin",
+  "pinterest.com": "pinterest",
+  "pin.it": "pinterest",
+  "reddit.com": "reddit",
+  "bing.com": "search",
+  "duckduckgo.com": "search",
 };
+
+// Search engines whose hostname varies by TLD (google.com, google.co.uk, …).
+// Matched by second-level label after stripping a leading `www.`.
+const SEARCH_HOST_PREFIXES = ["google."];
 
 /**
  * Resolve a coarse traffic source.
@@ -37,5 +48,43 @@ export function resolveSource(utmSource: string | null, referer: string | null):
   }
   if (!host) return "direct";
 
-  return HOST_SOURCES[host] ?? host.replace(/^www\./, "");
+  const bare = host.replace(/^www\./, "");
+  if (HOST_SOURCES[host]) return HOST_SOURCES[host];
+  if (HOST_SOURCES[bare]) return HOST_SOURCES[bare];
+  if (SEARCH_HOST_PREFIXES.some((p) => bare.startsWith(p))) return "search";
+  return bare;
+}
+
+// ---- presentation helpers (raw keys stay for aggregation) ----
+
+const SOURCE_LABELS: Record<string, string> = {
+  direct: "Direct",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  twitch: "Twitch",
+  youtube: "YouTube",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  pinterest: "Pinterest",
+  reddit: "Reddit",
+  search: "Search",
+};
+
+/** Friendly display label for a raw source key. Known keys get a proper name;
+ *  unknown keys (bare domains) are shown as-is. Empty → "Unknown". */
+export function sourceLabel(source: string): string {
+  if (!source) return "Unknown";
+  return SOURCE_LABELS[source] ?? source;
+}
+
+/** Friendly display label for a raw click-target key. Empty target (missing
+ *  payload) is surfaced as "Unknown link" rather than silently bucketed. */
+export function targetLabel(target: string): string {
+  return target ? target : "Unknown link";
+}
+
+/** Friendly label for a utm_medium / utm_campaign value (null/empty → given
+ *  fallback, e.g. "(none)"). */
+export function utmLabel(value: string | null, fallback = "(none)"): string {
+  return value && value.length > 0 ? value : fallback;
 }

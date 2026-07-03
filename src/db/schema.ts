@@ -60,6 +60,8 @@ export const landingEvents = sqliteTable("landing_events", {
   type: text("type").notNull(),                       // "pageview" | "click"
   source: text("source").notNull().default("direct"),// tiktok | instagram | twitch | direct | <domain>
   target: text("target").notNull().default(""),        // click only: which link
+  utmMedium: text("utm_medium"),                      // nullable marketing tag (utm_medium)
+  utmCampaign: text("utm_campaign"),                  // nullable marketing tag (utm_campaign)
   date: text("date").notNull(),                       // YYYY-MM-DD (server local)
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
