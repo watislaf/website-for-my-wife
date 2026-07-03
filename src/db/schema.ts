@@ -32,14 +32,20 @@ export const incomeSources = sqliteTable("income_sources", {
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
 });
 
+export const workDays = sqliteTable("work_days", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull().unique(),              // YYYY-MM-DD, one row per day
+  hours: real("hours").notNull().default(0),
+  note: text("note").notNull().default(""),
+});
+
 export const workEntries = sqliteTable("work_entries", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   date: text("date").notNull(),
   sourceId: integer("source_id").notNull().references(() => incomeSources.id),
-  hours: real("hours").notNull().default(0),
   amount: real("amount").notNull().default(0),
   note: text("note").notNull().default(""),
-});
+}, (t) => [unique("work_entry_date_source").on(t.date, t.sourceId)]);
 
 export const periodMarkers = sqliteTable("period_markers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
