@@ -6,6 +6,7 @@ import {
   BarChart3,
   Activity,
   Image,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,4 +24,5 @@ export const navItems: NavItem[] = [
   { label: "Stats", href: "/admin/stats", icon: BarChart3 },
   { label: "Traffic", href: "/admin/traffic", icon: Activity },
   { label: "Landing", href: "/admin/landing", icon: Image },
+  { label: "Achievements", href: "/admin/achievements", icon: Trophy },
 ];

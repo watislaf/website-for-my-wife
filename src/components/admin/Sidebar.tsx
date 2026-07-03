@@ -11,7 +11,13 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function Sidebar({ siteName }: { siteName: string }) {
+export function Sidebar({
+  siteName,
+  coins,
+}: {
+  siteName: string;
+  coins: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -22,6 +28,19 @@ export function Sidebar({ siteName }: { siteName: string }) {
         </span>
         <span className="hidden truncate font-heading text-lg font-semibold text-foreground md:inline">
           {siteName}
+        </span>
+      </div>
+
+      <div className="px-2 pb-2 md:px-4">
+        <span
+          className="flex items-center justify-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary md:justify-start"
+          title={`${coins} coins`}
+          aria-label={`${coins} coins`}
+        >
+          <span className="leading-none" aria-hidden>
+            🪙
+          </span>
+          <span className="hidden md:inline">{coins}</span>
         </span>
       </div>
 
