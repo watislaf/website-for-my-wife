@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="tier4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e0f5ff"/>
+      <stop offset="45%" stop-color="#8fd3ff"/>
+      <stop offset="100%" stop-color="#4a9fd0"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="61" fill="url(#tier4)"/>
+  <circle cx="64" cy="64" r="49" fill="#16a34a"/>
+  <text x="64" y="60" font-size="46" text-anchor="middle" dominant-baseline="central">🤝</text>
+  <text x="64" y="108" font-size="18" font-weight="bold" fill="#fff" text-anchor="middle">IV</text>
+</svg>

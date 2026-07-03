@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="metal_streak_master_3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#ffd700"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="61" fill="#ffd700"/>
+  <circle cx="64" cy="64" r="61" fill="url(#metal_streak_master_3)"/>
+  <circle cx="64" cy="64" r="49" fill="#ec4899"/>
+  <text x="64" y="60" font-size="46" text-anchor="middle" dominant-baseline="central">🔥</text>
+  <text x="64" y="108" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">III</text>
+</svg>

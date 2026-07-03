@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e8a870"/>
+      <stop offset="0.5" stop-color="#cd7f32"/>
+      <stop offset="1" stop-color="#8a5321"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="61" fill="url(#ring)"/>
+  <circle cx="64" cy="64" r="49" fill="#64748b"/>
+  <text x="64" y="58" font-size="46" text-anchor="middle" dominant-baseline="central">💎</text>
+  <text x="64" y="103" font-size="16" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" text-anchor="middle" dominant-baseline="central" fill="#ffffff">I</text>
+</svg>
