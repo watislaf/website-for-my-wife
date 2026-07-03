@@ -3,6 +3,7 @@
 import { db } from "@/db";
 import {
   workEntries,
+  workDays,
   periodMarkers,
   incomeSources,
   goals,
@@ -42,6 +43,7 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
   try {
     // ---- Load everything the engine needs ----
     const [
+      dayRows,
       entries,
       markers,
       sources,
@@ -55,11 +57,13 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
       coinsRows,
     ] = await Promise.all([
       db
+        .select({ id: workDays.id, date: workDays.date, hours: workDays.hours, note: workDays.note })
+        .from(workDays),
+      db
         .select({
           id: workEntries.id,
           date: workEntries.date,
           sourceId: workEntries.sourceId,
-          hours: workEntries.hours,
           amount: workEntries.amount,
           note: workEntries.note,
         })
@@ -117,6 +121,7 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
     }
 
     const earned = computeEarned({
+      days: dayRows,
       entries,
       markers,
       sources,

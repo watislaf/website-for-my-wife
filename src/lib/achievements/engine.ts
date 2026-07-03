@@ -7,11 +7,12 @@
 // onConflictDoNothing) so that already-earned instances stay earned.
 
 import { ACHIEVEMENTS, type MetricId } from "./catalog";
-import { buildPeriods, type WorkEntryLite, type MarkerLite } from "../periods";
+import { buildPeriods, type WorkDayLite, type WorkEntryLite, type MarkerLite } from "../periods";
 import { currentStreak, bestStreak } from "../streaks";
 
 export type EarnInput = {
-  entries: { id: number; date: string; sourceId: number; hours: number; amount: number; note: string }[];
+  days: { id: number; date: string; hours: number; note: string }[];
+  entries: { id: number; date: string; sourceId: number; amount: number; note: string }[];
   markers: { id: number; endDate: string; name: string }[];
   sources: { id: number }[];
   goals: { id: number; archived: boolean }[];
@@ -40,11 +41,12 @@ type Instance = { instanceKey: string; value: number };
 
 export function computeEarned(input: EarnInput): Earned[] {
   // ---- GLOBAL metric values (one number per metric id) ----
-  const totalHours = sum(input.entries.map((e) => e.hours));
+  const totalHours = sum(input.days.map((d) => d.hours));
   const totalEarnings = sum(input.entries.map((e) => e.amount));
-  const distinctDays = new Set(input.entries.map((e) => e.date)).size;
+  const distinctDays = new Set(input.days.filter((d) => d.hours > 0).map((d) => d.date)).size;
 
   const periods = buildPeriods(
+    input.days as WorkDayLite[],
     input.entries as WorkEntryLite[],
     input.markers as MarkerLite[],
   );

@@ -3,6 +3,7 @@ import { computeEarned, type EarnInput } from "./engine";
 
 function baseInput(over: Partial<EarnInput> = {}): EarnInput {
   return {
+    days: [],
     entries: [],
     markers: [],
     sources: [],
@@ -32,7 +33,8 @@ describe("computeEarned", () => {
   it("crosses a global tier for total_hours (marathoner)", () => {
     // 120 total hours in one entry → marathoner-1 (100) yes, marathoner-2 (500) no.
     const input = baseInput({
-      entries: [{ id: 1, date: "2026-07-01", sourceId: 1, hours: 120, amount: 6000, note: "" }],
+      days: [{ id: 1, date: "2026-07-01", hours: 120, note: "" }],
+      entries: [{ id: 1, date: "2026-07-01", sourceId: 1, amount: 6000, note: "" }],
     });
     const earned = computeEarned(input);
     const k = earned.map((e) => e.key);
@@ -45,9 +47,13 @@ describe("computeEarned", () => {
   it("earns a repeatable per-period achievement once per qualifying period", () => {
     // Two closed periods, each with >= 40 hours (hard-worker-1, scope period).
     const input = baseInput({
+      days: [
+        { id: 1, date: "2026-05-10", hours: 40, note: "" },
+        { id: 2, date: "2026-06-10", hours: 45, note: "" },
+      ],
       entries: [
-        { id: 1, date: "2026-05-10", sourceId: 1, hours: 40, amount: 400, note: "" },
-        { id: 2, date: "2026-06-10", sourceId: 1, hours: 45, amount: 450, note: "" },
+        { id: 1, date: "2026-05-10", sourceId: 1, amount: 400, note: "" },
+        { id: 2, date: "2026-06-10", sourceId: 1, amount: 450, note: "" },
       ],
       markers: [
         { id: 100, endDate: "2026-05-31", name: "May" },
@@ -64,8 +70,8 @@ describe("computeEarned", () => {
     const input = baseInput({
       sources: [{ id: 7 }, { id: 8 }],
       entries: [
-        { id: 1, date: "2026-07-01", sourceId: 7, hours: 5, amount: 1200, note: "" },
-        { id: 2, date: "2026-07-02", sourceId: 8, hours: 5, amount: 300, note: "" },
+        { id: 1, date: "2026-07-01", sourceId: 7, amount: 1200, note: "" },
+        { id: 2, date: "2026-07-02", sourceId: 8, amount: 300, note: "" },
       ],
     });
     const loyal = computeEarned(input).filter((e) => e.key === "loyal-client-1");
@@ -99,7 +105,7 @@ describe("computeEarned", () => {
     // 5 hours total, no goals, nothing else → no work/earnings tiers, no milestones
     // beyond first-dollar (which one entry DOES earn). Assert a real below-threshold miss.
     const input = baseInput({
-      entries: [{ id: 1, date: "2026-07-01", sourceId: 1, hours: 5, amount: 50, note: "" }],
+      entries: [{ id: 1, date: "2026-07-01", sourceId: 1, amount: 50, note: "" }],
     });
     const k = keys(input);
     expect(k).not.toContain("marathoner-1"); // needs 100 total hours
