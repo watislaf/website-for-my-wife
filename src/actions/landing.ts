@@ -65,7 +65,7 @@ export async function saveLandingSocials(
   const cleaned = socials.map((s) => ({
     name: s.name.trim(),
     handle: s.handle.trim(),
-    url: s.url.trim(),
+    url: s.url.trim() || "#",
     accent: s.accent.trim() || "#ec4899",
   }));
 

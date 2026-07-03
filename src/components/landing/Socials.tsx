@@ -15,8 +15,8 @@ export function Socials({ content }: { content: LandingContent }) {
         Find Me
       </h2>
       <div className="grid gap-6 md:grid-cols-3">
-        {content.socials.map((s) => (
-          <motion.div key={s.name} whileHover={{ y: -6 }}>
+        {content.socials.map((s, i) => (
+          <motion.div key={i} whileHover={{ y: -6 }}>
             <Card
               className="border-l-4 p-6"
               style={{ borderLeftColor: s.accent }}

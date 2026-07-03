@@ -39,9 +39,9 @@ export function Hero({ content }: { content: LandingContent }) {
             transition={{ delay: 0.5 }}
             className="mt-8 flex gap-3 justify-center"
           >
-            {content.socials.map((s) => (
+            {content.socials.map((s, i) => (
               <Button
-                key={s.name}
+                key={i}
                 size="lg"
                 variant="secondary"
                 render={
