@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Reveal } from "@/components/motion/Reveal";
 import { Stagger } from "@/components/motion/Stagger";
 import { BadgeDetailDialog } from "./BadgeDetailDialog";
+import { BadgeArt } from "./BadgeArt";
 
 export type Earned = {
   count: number;
@@ -34,15 +35,33 @@ function LockedCard({ def }: { def: AchievementDef }) {
   return (
     <div
       title={def.hint}
-      className="flex h-full flex-col items-center gap-2 rounded-xl bg-card px-3 py-4 text-center ring-1 ring-foreground/10 opacity-90"
+      className="flex h-full flex-col items-center gap-2 rounded-xl bg-card px-3 py-4 text-center ring-1 ring-foreground/10"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/badges/${def.key}.svg`}
-        alt="Locked achievement"
-        className="size-16 md:size-20 [filter:brightness(0)_opacity(0.22)]"
-      />
-      <span className="text-sm font-semibold text-muted-foreground">???</span>
+      <div className="relative size-16 md:size-20">
+        {/* The real badge, drained to unlit gray behind frosted glass. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/badges/${def.key}.svg`}
+          alt="Locked achievement"
+          className="size-full opacity-30 grayscale brightness-[.55] contrast-[.85]"
+        />
+        <div className="absolute inset-0 grid place-items-center rounded-full bg-neutral-500/20 ring-1 ring-inset ring-foreground/10 backdrop-blur-[2px] backdrop-grayscale">
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden
+            className="size-5 text-muted-foreground/80"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+          </svg>
+        </div>
+      </div>
+      <span className="text-sm font-semibold text-muted-foreground">Locked</span>
       <span className="text-xs text-muted-foreground line-clamp-3">
         {def.hint}
       </span>
@@ -70,11 +89,11 @@ function UnlockedCard({
       whileTap={{ scale: 0.97 }}
       className="flex h-full w-full flex-col items-center gap-2 rounded-xl bg-card px-3 py-4 text-center ring-2 ring-primary/40 shadow-sm cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/badges/${def.key}.svg`}
+      <BadgeArt
+        badgeKey={def.key}
+        effect={def.effect}
         alt={def.name}
-        className="size-16 md:size-20 drop-shadow-sm"
+        imgClassName="size-16 md:size-20 drop-shadow-sm"
       />
       <span className="text-sm font-semibold leading-snug">
         {def.name}

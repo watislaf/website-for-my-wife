@@ -25,6 +25,26 @@ export type Category =
 
 export type Scope = "global" | "period" | "source" | "day";
 
+// Optional flashy CSS effect rendered around a badge when it's displayed.
+// Purely cosmetic — reserved for the rarest / most fun achievements so the
+// grid doesn't turn into a light show. See `.badge-fx--<effect>` in globals.css.
+export type BadgeEffect =
+  | "glow"
+  | "fire"
+  | "electric"
+  | "rainbow"
+  | "rainbow-rain"
+  | "gold"
+  | "holo"
+  | "frost"
+  | "aurora"
+  | "cosmic"
+  | "toxic"
+  | "neon"
+  | "sparkle"
+  | "heartbeat"
+  | "shadow";
+
 // Union of EXACTLY the fixed metric ids the engine implements.
 export type MetricId =
   // GLOBAL (one-time; earned once when value >= threshold)
@@ -78,6 +98,8 @@ export type AchievementDef = {
   scope: Scope;
   threshold: number;
   coins: number;
+  /** Optional cosmetic CSS effect shown around the badge (see BadgeEffect). */
+  effect?: BadgeEffect;
 };
 
 // Coin values by tier (I..IV) and for milestones.
@@ -135,7 +157,7 @@ function milestone(cfg: {
   };
 }
 
-export const ACHIEVEMENTS: AchievementDef[] = [
+const RAW_ACHIEVEMENTS: AchievementDef[] = [
   // ── WORK ────────────────────────────────────────────────────────────────
   ...family({
     group: "hard-worker",
@@ -551,6 +573,53 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     ],
   }),
 ];
+
+// Which achievements get a flashy CSS effect. Deliberately sparse: mostly the
+// hardest top-tier tiers plus a few thematically-fitting one-offs, so effects
+// stay a rare treat rather than visual noise. Keys must exist in the catalog.
+const EFFECT_BY_KEY: Record<string, BadgeEffect> = {
+  // Work — sheer effort burns.
+  "hard-worker-4": "fire",
+  "marathoner-4": "fire",
+  "grinder-4": "aurora", // a full year of showing up
+
+  // Earnings — money shines.
+  "big-payday-4": "gold",
+  "breadwinner-4": "gold",
+  "loyal-client-4": "toxic", // a client that just keeps paying — radioactive-good
+  "high-roller-4": "rainbow-rain", // literally make it rain
+
+  // Consistency — streaks crackle and freeze.
+  "streak-master-4": "electric",
+  "legendary-streak-1": "shadow",
+  "legendary-streak-2": "glow",
+  "consistency-4": "frost",
+  "perfect-day": "sparkle",
+
+  // Planner — mastery.
+  "planner-pro-4": "neon",
+
+  // Audience — going big / going viral.
+  "famous-4": "holo",
+  "viral-day-3": "electric",
+  "mailing-list-4": "cosmic",
+  "engager-4": "neon",
+
+  // Milestones — the sentimental first + the coin whale.
+  "first-fan": "heartbeat",
+  "first-subscriber": "heartbeat",
+  "rich-3": "rainbow",
+};
+
+/**
+ * Public catalog: the raw defs with cosmetic effects attached. Kept as a
+ * separate pass so the (huge) data literal above stays clean and the
+ * effect→achievement mapping lives in one readable place.
+ */
+export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((a) => {
+  const effect = EFFECT_BY_KEY[a.key];
+  return effect ? { ...a, effect } : a;
+});
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   // Insertion order implies display order.

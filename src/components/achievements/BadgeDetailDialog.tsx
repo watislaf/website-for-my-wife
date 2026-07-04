@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { formatEarnedDate, type Earned } from "./BadgeGrid";
+import { BadgeArt } from "./BadgeArt";
 
 /**
  * Detail view for a single unlocked achievement. Renders a large badge inside a
@@ -37,11 +38,11 @@ export function BadgeDetailDialog({
 
             <div className="flex flex-col items-center gap-4 py-2">
               <TiltCard className="rounded-2xl bg-card p-8 ring-1 ring-foreground/10 shadow-md">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/badges/${def.key}.svg`}
+                <BadgeArt
+                  badgeKey={def.key}
+                  effect={def.effect}
                   alt={def.name}
-                  className="size-32 md:size-40 drop-shadow"
+                  imgClassName="size-32 md:size-40 drop-shadow"
                   style={{ transform: "translateZ(40px)" }}
                 />
               </TiltCard>

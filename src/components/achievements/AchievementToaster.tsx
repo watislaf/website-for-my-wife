@@ -8,6 +8,7 @@ import {
   markSeen,
   type UnseenAchievement,
 } from "@/actions/achievements";
+import { BadgeArt } from "./BadgeArt";
 
 const AUTO_DISMISS_MS = 6000;
 // Cap simultaneous popups so a first sync over a data-rich account can't flood
@@ -125,12 +126,22 @@ function Toast({
       }}
       className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl border border-primary/30 bg-card/95 px-4 py-3 text-left shadow-lg ring-1 ring-primary/10 backdrop-blur transition-colors hover:border-primary/50"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/badges/${a.achievementKey}.svg`}
-        alt=""
-        className="size-12 shrink-0"
-      />
+      <span className="relative size-12 shrink-0">
+        <BadgeArt
+          badgeKey={a.achievementKey}
+          effect={a.effect}
+          alt=""
+          className="size-full"
+          imgClassName="size-full drop-shadow-sm"
+        />
+        {/* One-shot light sweep on unlock, clipped to a circle. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-full"
+        >
+          <span className="badge-shine absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+        </span>
+      </span>
       <span className="flex min-w-0 flex-col">
         <span className="text-xs font-semibold uppercase tracking-wide text-primary">
           Achievement unlocked!

@@ -10,7 +10,8 @@
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
-    "db:seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts"
+    "db:seed": "NODE_OPTIONS=--conditions=react-server tsx scripts/seed.ts",
+    "badges": "tsx scripts/generate-badges.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

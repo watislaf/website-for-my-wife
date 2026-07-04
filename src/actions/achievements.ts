@@ -16,7 +16,11 @@ import {
 import { and, eq, count, sum, inArray, sql } from "drizzle-orm";
 import { todayStr } from "@/lib/dates";
 import { computeEarned } from "@/lib/achievements/engine";
-import { achievementByKey, type Category } from "@/lib/achievements/catalog";
+import {
+  achievementByKey,
+  type Category,
+  type BadgeEffect,
+} from "@/lib/achievements/catalog";
 import { getLandingContent } from "@/lib/site-content";
 import { landing } from "@/content/landing";
 
@@ -31,6 +35,7 @@ export type UnseenAchievement = {
   description: string;
   category: Category;
   tier: number;
+  effect?: BadgeEffect;
 };
 
 /**
@@ -172,6 +177,7 @@ export async function syncAndGetUnseen(): Promise<UnseenAchievement[]> {
           description: def.description,
           category: def.category,
           tier: def.tier,
+          effect: def.effect,
         };
       })
       .filter((x): x is UnseenAchievement => x !== null);
